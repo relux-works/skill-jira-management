@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -143,6 +145,9 @@ func (c *Client) request(method, path string, query url.Values, body interface{}
 		resp, err := c.httpClient.Do(req)
 		if err != nil {
 			lastErr = fmt.Errorf("jira: request failed: %w", err)
+			if isNetworkError(err) {
+				return nil, fmt.Errorf("%w\n\nHint: could not reach %s — check your network connection or corporate VPN", lastErr, c.baseURL)
+			}
 			if attempt < maxRetries {
 				time.Sleep(backoff(attempt))
 				// Reset body reader for retry.
@@ -199,6 +204,28 @@ func (c *Client) request(method, path string, query url.Values, body interface{}
 	}
 
 	return nil, lastErr
+}
+
+// isNetworkError checks whether the error is a network-level failure
+// (DNS resolution, connection refused, timeout) where retrying won't help
+// and the user likely needs to check VPN or network connectivity.
+func isNetworkError(err error) bool {
+	if err == nil {
+		return false
+	}
+	var dnsErr *net.DNSError
+	var opErr *net.OpError
+	if errors.As(err, &dnsErr) {
+		return true
+	}
+	if errors.As(err, &opErr) {
+		return true
+	}
+	msg := err.Error()
+	return strings.Contains(msg, "no such host") ||
+		strings.Contains(msg, "connection refused") ||
+		strings.Contains(msg, "network is unreachable") ||
+		strings.Contains(msg, "i/o timeout")
 }
 
 // backoff returns an exponential backoff duration for the given attempt.

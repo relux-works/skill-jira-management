@@ -272,7 +272,7 @@ func TestKeychainStore_KeyringGetCorruptData(t *testing.T) {
 	mk := newMockKeyring()
 	store := NewKeychainStore(mk.set, mk.get, mk.delete)
 
-	// Manually insert corrupt JSON
+	// Manually insert corrupt JSON into current service name
 	mk.store[serviceName] = map[string]string{
 		"https://bad.atlassian.net": "not-json",
 	}
@@ -280,5 +280,60 @@ func TestKeychainStore_KeyringGetCorruptData(t *testing.T) {
 	_, err := store.Load("https://bad.atlassian.net")
 	if err == nil {
 		t.Fatal("Load() should fail with corrupt JSON data")
+	}
+}
+
+func TestKeychainStore_LegacyMigration(t *testing.T) {
+	mk := newMockKeyring()
+	store := NewKeychainStore(mk.set, mk.get, mk.delete)
+	creds := validCreds()
+
+	// Simulate legacy: save directly under old service name
+	data := `{"instance_url":"https://test.atlassian.net","email":"user@test.com","api_token":"test-token-123"}`
+	mk.store[legacyServiceName] = map[string]string{
+		creds.InstanceURL: data,
+	}
+
+	// Load should find it via legacy fallback
+	loaded, err := store.Load(creds.InstanceURL)
+	if err != nil {
+		t.Fatalf("Load() from legacy error = %v", err)
+	}
+	if loaded.APIToken != creds.APIToken {
+		t.Errorf("APIToken = %q, want %q", loaded.APIToken, creds.APIToken)
+	}
+
+	// Should have migrated: present in new, gone from legacy
+	if _, ok := mk.store[serviceName][creds.InstanceURL]; !ok {
+		t.Error("credentials should be migrated to new service name")
+	}
+	if _, ok := mk.store[legacyServiceName][creds.InstanceURL]; ok {
+		t.Error("credentials should be removed from legacy service name")
+	}
+}
+
+func TestKeychainStore_LegacyNotUsedWhenNewExists(t *testing.T) {
+	mk := newMockKeyring()
+	store := NewKeychainStore(mk.set, mk.get, mk.delete)
+
+	// Put different tokens in legacy and new
+	legacyData := `{"instance_url":"https://test.atlassian.net","email":"user@test.com","api_token":"old-token"}`
+	newData := `{"instance_url":"https://test.atlassian.net","email":"user@test.com","api_token":"new-token"}`
+
+	mk.store[legacyServiceName] = map[string]string{
+		"https://test.atlassian.net": legacyData,
+	}
+	mk.store[serviceName] = map[string]string{
+		"https://test.atlassian.net": newData,
+	}
+
+	loaded, err := store.Load("https://test.atlassian.net")
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	// Should use new, not legacy
+	if loaded.APIToken != "new-token" {
+		t.Errorf("APIToken = %q, want %q (should prefer new over legacy)", loaded.APIToken, "new-token")
 	}
 }

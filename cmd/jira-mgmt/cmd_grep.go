@@ -25,9 +25,9 @@ Scopes:
   all      — search everything (default)
 
 Examples:
-  jira-mgmt grep "authentication"
-  jira-mgmt grep "TODO" --scope issues -i
-  jira-mgmt grep "deploy" --scope comments -C 2`,
+  jira-mgmt grep "authentication" --format json
+  jira-mgmt grep "TODO" --scope issues -i --format compact
+  jira-mgmt grep "deploy" --scope comments -C 2 --format json`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		pattern := args[0]
@@ -84,6 +84,7 @@ Examples:
 		}
 
 		out := cmd.OutOrStdout()
+		// "json" -> JSON, "text"/"compact"/"llm" -> text format
 		if flagFormat == "json" {
 			data, err := search.PrintJSON(allMatches)
 			if err != nil {

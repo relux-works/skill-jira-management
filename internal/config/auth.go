@@ -6,8 +6,12 @@ import (
 	"fmt"
 )
 
-// serviceName is the keychain service identifier for all jira-mgmt credentials.
-const serviceName = "jira-mgmt"
+// serviceName is the keychain service identifier for all Atlassian CLI credentials.
+// Shared across jira-mgmt and confluence-mgmt — same Atlassian API token works for both.
+const serviceName = "atlassian-mgmt"
+
+// legacyServiceName is the old keychain service name used before the shared store migration.
+const legacyServiceName = "jira-mgmt"
 
 // Credentials holds the authentication details for a Jira instance.
 type Credentials struct {
@@ -87,19 +91,39 @@ func (k *KeychainStore) Save(creds Credentials) error {
 }
 
 // Load retrieves and deserializes credentials from the keychain for the given instance URL.
+// Tries the current service name first. If not found, checks the legacy service name
+// and migrates credentials to the new store (one-time migration on the fly).
 func (k *KeychainStore) Load(instanceURL string) (Credentials, error) {
 	if instanceURL == "" {
 		return Credentials{}, errors.New("instance URL is required")
 	}
 
+	// Try current service name.
 	data, err := k.keyringGet(serviceName, instanceURL)
+	if err == nil {
+		var creds Credentials
+		if err := json.Unmarshal([]byte(data), &creds); err != nil {
+			return Credentials{}, fmt.Errorf("unmarshaling credentials: %w", err)
+		}
+		return creds, nil
+	}
+
+	// Fallback: try legacy service name and migrate if found.
+	data, err = k.keyringGet(legacyServiceName, instanceURL)
 	if err != nil {
 		return Credentials{}, ErrCredentialsNotFound
 	}
 
 	var creds Credentials
 	if err := json.Unmarshal([]byte(data), &creds); err != nil {
-		return Credentials{}, fmt.Errorf("unmarshaling credentials: %w", err)
+		return Credentials{}, fmt.Errorf("unmarshaling legacy credentials: %w", err)
+	}
+
+	// Migrate: save to new store, delete from legacy.
+	if jsonData, err := json.Marshal(creds); err == nil {
+		if err := k.keyringSet(serviceName, instanceURL, string(jsonData)); err == nil {
+			_ = k.keyringDelete(legacyServiceName, instanceURL)
+		}
 	}
 
 	return creds, nil
