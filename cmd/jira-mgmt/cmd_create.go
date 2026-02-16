@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/ivalx1s/skill-jira-management/internal/jira"
+	"github.com/relux-works/skill-jira-management/internal/jira"
 	"github.com/spf13/cobra"
 )
 

@@ -3,7 +3,7 @@ package search
 import (
 	"testing"
 
-	"github.com/ivalx1s/skill-jira-management/internal/jira"
+	"github.com/relux-works/skill-jira-management/internal/jira"
 )
 
 func TestGrepIssues_Summary(t *testing.T) {

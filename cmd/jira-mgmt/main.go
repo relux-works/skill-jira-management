@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/ivalx1s/skill-jira-management/internal/config"
+	"github.com/relux-works/skill-jira-management/internal/config"
 	"github.com/spf13/cobra"
 )
 

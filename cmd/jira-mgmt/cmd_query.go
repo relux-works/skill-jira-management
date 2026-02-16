@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/ivalx1s/skill-agent-facing-api/agentquery"
-	"github.com/ivalx1s/skill-jira-management/internal/jira"
-	"github.com/ivalx1s/skill-jira-management/internal/query"
+	"github.com/relux-works/skill-agent-facing-api/agentquery"
+	"github.com/relux-works/skill-jira-management/internal/jira"
+	"github.com/relux-works/skill-jira-management/internal/query"
 	"github.com/spf13/cobra"
 )
 

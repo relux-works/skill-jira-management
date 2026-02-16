@@ -8,8 +8,8 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/ivalx1s/skill-agent-facing-api/agentquery"
-	"github.com/ivalx1s/skill-jira-management/internal/jira"
+	"github.com/relux-works/skill-agent-facing-api/agentquery"
+	"github.com/relux-works/skill-jira-management/internal/jira"
 )
 
 // JiraAPIFieldMap maps DSL field names to Jira REST API field names.

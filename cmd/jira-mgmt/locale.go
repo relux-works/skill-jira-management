@@ -1,6 +1,6 @@
 package main
 
-import "github.com/ivalx1s/skill-jira-management/internal/config"
+import "github.com/relux-works/skill-jira-management/internal/config"
 
 // localeStrings holds locale-specific default text templates.
 var localeStrings = map[config.Locale]map[string]string{
