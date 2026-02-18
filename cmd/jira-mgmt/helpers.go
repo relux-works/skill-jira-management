@@ -41,10 +41,11 @@ func buildJiraClientFromConfig() (*jira.Client, error) {
 	}
 
 	return jira.NewClient(jira.Config{
-		BaseURL:      creds.InstanceURL,
-		Email:        creds.Email,
-		Token:        creds.APIToken,
-		InstanceType: jira.InstanceType(cfg.InstanceType),
-		AuthType:     jira.AuthType(cfg.AuthType),
+		BaseURL:            creds.InstanceURL,
+		Email:              creds.Email,
+		Token:              creds.APIToken,
+		InstanceType:       jira.InstanceType(cfg.InstanceType),
+		AuthType:           jira.AuthType(cfg.AuthType),
+		InsecureSkipVerify: flagInsecure || cfg.TLSSkipVerify,
 	})
 }

@@ -17,9 +17,10 @@ var (
 
 // Global flags.
 var (
-	flagProject string
-	flagBoard   int
-	flagFormat  string
+	flagProject  string
+	flagBoard    int
+	flagFormat   string
+	flagInsecure bool
 )
 
 func main() {
@@ -50,6 +51,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&flagProject, "project", "", "Jira project key (overrides config)")
 	rootCmd.PersistentFlags().IntVar(&flagBoard, "board", 0, "Jira board ID (overrides config)")
 	rootCmd.PersistentFlags().StringVar(&flagFormat, "format", "json", "Output format: json or text")
+	rootCmd.PersistentFlags().BoolVar(&flagInsecure, "insecure", false, "Skip TLS certificate verification (for corporate CAs)")
 
 	rootCmd.AddCommand(versionCmd)
 }

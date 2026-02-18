@@ -19,14 +19,16 @@ var configSetCmd = &cobra.Command{
 	Long: `Set a configuration value.
 
 Keys:
-  project  — active Jira project key (e.g. PROJ)
-  board    — active board ID (e.g. 42)
-  locale   — content locale: en or ru
+  project          — active Jira project key (e.g. PROJ)
+  board            — active board ID (e.g. 42)
+  locale           — content locale: en or ru
+  tls_skip_verify  — skip TLS cert verification: true/false (for corporate CAs)
 
 Examples:
   jira-mgmt config set project MYPROJ
   jira-mgmt config set board 42
-  jira-mgmt config set locale en`,
+  jira-mgmt config set locale en
+  jira-mgmt config set tls_skip_verify true`,
 	Args: cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		key := args[0]
@@ -62,8 +64,15 @@ Examples:
 			}
 			fmt.Fprintf(out, "Locale set to %s\n", value)
 
+		case "tls_skip_verify":
+			skip := value == "true" || value == "1" || value == "yes"
+			if err := cfgMgr.SetTLSSkipVerify(skip); err != nil {
+				return err
+			}
+			fmt.Fprintf(out, "TLS skip verify set to %v\n", skip)
+
 		default:
-			return fmt.Errorf("unknown config key %q (supported: project, board, locale)", key)
+			return fmt.Errorf("unknown config key %q (supported: project, board, locale, tls_skip_verify)", key)
 		}
 
 		return nil
@@ -96,6 +105,7 @@ var configShowCmd = &cobra.Command{
 			fmt.Fprintf(out, "  active board:   (none)\n")
 		}
 		fmt.Fprintf(out, "  locale:         %s\n", cfg.Locale)
+		fmt.Fprintf(out, "  tls skip verify: %v\n", cfg.TLSSkipVerify)
 
 		return nil
 	},

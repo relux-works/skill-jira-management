@@ -2,6 +2,7 @@ package jira
 
 import (
 	"bytes"
+	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -63,12 +64,17 @@ func NewClient(cfg Config) (*Client, error) {
 		authHeader = "Basic " + base64.StdEncoding.EncodeToString([]byte(creds))
 	}
 
+	httpClient := &http.Client{Timeout: 30 * time.Second}
+	if cfg.InsecureSkipVerify {
+		httpClient.Transport = &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		}
+	}
+
 	return &Client{
-		baseURL:    baseURL,
-		authHeader: authHeader,
-		httpClient: &http.Client{
-			Timeout: 30 * time.Second,
-		},
+		baseURL:      baseURL,
+		authHeader:   authHeader,
+		httpClient:   httpClient,
 		instanceType: cfg.InstanceType,
 	}, nil
 }

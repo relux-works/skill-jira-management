@@ -25,11 +25,12 @@ const (
 
 // Config holds the configuration needed to connect to a Jira instance.
 type Config struct {
-	BaseURL      string       // e.g. "https://mycompany.atlassian.net"
-	Email        string       // Required for Basic auth (Cloud)
-	Token        string       // API token (Basic) or PAT (Bearer)
-	InstanceType InstanceType // "cloud" or "server" — auto-detected if empty
-	AuthType     AuthType     // "basic" or "bearer" — inferred from Email presence if empty
+	BaseURL            string       // e.g. "https://mycompany.atlassian.net"
+	Email              string       // Required for Basic auth (Cloud)
+	Token              string       // API token (Basic) or PAT (Bearer)
+	InstanceType       InstanceType // "cloud" or "server" — auto-detected if empty
+	AuthType           AuthType     // "basic" or "bearer" — inferred from Email presence if empty
+	InsecureSkipVerify bool         // Skip TLS certificate verification (corporate CAs)
 }
 
 // --- Error Types ---
