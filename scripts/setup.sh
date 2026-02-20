@@ -4,47 +4,54 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-echo "=== jira-mgmt Setup ==="
+SKILL_NAME="jira-management"
+SKILL_CONTENT_DIR="$PROJECT_ROOT/agents/skills/$SKILL_NAME"
+
+AGENTS_DIR="$HOME/.agents/skills"
+CLAUDE_DIR="$HOME/.claude/skills"
+CODEX_DIR="$HOME/.codex/skills"
+
+echo "=== $SKILL_NAME Setup ==="
 
 # 1. Build binary
 echo "Building jira-mgmt binary..."
 cd "$PROJECT_ROOT"
 go build -o jira-mgmt ./cmd/jira-mgmt/
 
-# 2. Create ~/.local/bin if it doesn't exist
+# 2. Symlink binary to ~/.local/bin
 mkdir -p "$HOME/.local/bin"
-
-# 3. Symlink binary to ~/.local/bin
-echo "Creating symlink to ~/.local/bin/jira-mgmt..."
 ln -sf "$PROJECT_ROOT/jira-mgmt" "$HOME/.local/bin/jira-mgmt"
+echo "  Binary -> ~/.local/bin/jira-mgmt"
 
-# 4. Verify PATH
+# 3. Verify PATH
 if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
-  echo ""
-  echo "WARNING: ~/.local/bin is not in your PATH"
-  echo "Add this to your ~/.zshrc:"
-  echo '  export PATH="$HOME/.local/bin:$PATH"'
-  echo ""
+  echo "  WARNING: ~/.local/bin is not in your PATH"
 fi
 
-# 5. Create skill symlinks
-echo "Creating skill symlinks..."
+# 4. Copy skill into .agents/skills/ (installed copy, not a symlink)
+echo "Installing skill: $SKILL_NAME"
+if [ -L "$AGENTS_DIR/$SKILL_NAME" ]; then
+  rm -f "$AGENTS_DIR/$SKILL_NAME"
+fi
+mkdir -p "$AGENTS_DIR/$SKILL_NAME"
+rsync -a --delete "$SKILL_CONTENT_DIR/" "$AGENTS_DIR/$SKILL_NAME/" --exclude='.git'
+echo "  Copied -> $AGENTS_DIR/$SKILL_NAME/"
 
-# Claude Code symlink
-mkdir -p "$HOME/.claude/skills"
-ln -sf "$PROJECT_ROOT/agents/skills/jira-management" "$HOME/.claude/skills/jira-management"
+# 5. Symlink from .claude/skills/ -> .agents/skills/
+mkdir -p "$CLAUDE_DIR"
+rm -f "$CLAUDE_DIR/$SKILL_NAME"
+ln -s "$AGENTS_DIR/$SKILL_NAME" "$CLAUDE_DIR/$SKILL_NAME"
+echo "  Symlink -> $CLAUDE_DIR/$SKILL_NAME"
 
-# Codex CLI symlink
-mkdir -p "$HOME/.codex/skills"
-ln -sf "$PROJECT_ROOT/agents/skills/jira-management" "$HOME/.codex/skills/jira-management"
+# 6. Symlink from .codex/skills/ -> .agents/skills/
+mkdir -p "$CODEX_DIR"
+rm -f "$CODEX_DIR/$SKILL_NAME"
+ln -s "$AGENTS_DIR/$SKILL_NAME" "$CODEX_DIR/$SKILL_NAME"
+echo "  Symlink -> $CODEX_DIR/$SKILL_NAME"
 
 echo ""
-echo "Setup complete!"
-echo "Binary: $HOME/.local/bin/jira-mgmt"
-echo "Skill (Claude): ~/.claude/skills/jira-management"
-echo "Skill (Codex): ~/.codex/skills/jira-management"
+echo "Done. Installed $(git -C "$PROJECT_ROOT" describe --tags --always 2>/dev/null || echo 'unknown')"
 echo ""
 echo "Next steps:"
-echo "  1. Ensure ~/.local/bin is in your PATH"
-echo "  2. Run: jira-mgmt auth"
-echo "  3. Configure: jira-mgmt config set project YOUR-KEY"
+echo "  jira-mgmt auth"
+echo "  jira-mgmt config set project YOUR-KEY"
