@@ -2,16 +2,16 @@
 done
 
 ## Assigned To
-agent-skill
+codex
 
 ## Created
-2026-02-12T11:40:06Z
+2026-04-01T15:05:10Z
 
 ## Last Update
 2026-04-01T15:12:28Z
 
 ## Blocked By
-- STORY-260212-3mqvuv
+- (none)
 
 ## Blocks
 - (none)

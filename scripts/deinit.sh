@@ -21,12 +21,12 @@ done
 
 echo "=== jira-mgmt Deinit ==="
 
-# 1. Remove binary symlink
-if [[ -L "$HOME/.local/bin/jira-mgmt" ]]; then
-  echo "Removing binary symlink..."
-  rm "$HOME/.local/bin/jira-mgmt"
+# 1. Remove installed binary artifact
+if [[ -e "$HOME/.local/bin/jira-mgmt" || -L "$HOME/.local/bin/jira-mgmt" ]]; then
+  echo "Removing installed binary..."
+  rm -f "$HOME/.local/bin/jira-mgmt"
 else
-  echo "Binary symlink not found (already removed or never created)"
+  echo "Installed binary not found (already removed or never installed)"
 fi
 
 # 2. Remove Claude Code skill symlink
