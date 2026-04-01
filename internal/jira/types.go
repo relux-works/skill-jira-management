@@ -307,14 +307,41 @@ type SprintSearchResult struct {
 
 // Transition represents a workflow transition.
 type Transition struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
-	To   Status `json:"to"`
+	ID     string                     `json:"id"`
+	Name   string                     `json:"name"`
+	To     Status                     `json:"to"`
+	Fields map[string]TransitionField `json:"fields,omitempty"`
 }
 
 // TransitionsResponse wraps the transitions list.
 type TransitionsResponse struct {
 	Transitions []Transition `json:"transitions"`
+}
+
+// TransitionField describes an issue field exposed on a workflow transition screen.
+type TransitionField struct {
+	Required      bool                  `json:"required,omitempty"`
+	Schema        *TransitionFieldSchema `json:"schema,omitempty"`
+	Name          string                `json:"name,omitempty"`
+	FieldID       string                `json:"fieldId,omitempty"`
+	Operations    []string              `json:"operations,omitempty"`
+	AllowedValues []TransitionOption    `json:"allowedValues,omitempty"`
+}
+
+// TransitionFieldSchema describes a transition field schema.
+type TransitionFieldSchema struct {
+	Type     string `json:"type,omitempty"`
+	System   string `json:"system,omitempty"`
+	Custom   string `json:"custom,omitempty"`
+	CustomID int    `json:"customId,omitempty"`
+}
+
+// TransitionOption is an allowed option value for a transition field.
+type TransitionOption struct {
+	ID       string `json:"id,omitempty"`
+	Name     string `json:"name,omitempty"`
+	Value    string `json:"value,omitempty"`
+	Disabled bool   `json:"disabled,omitempty"`
 }
 
 // DoTransitionRequest is the request body for executing a transition.
@@ -388,7 +415,7 @@ type CommentsResponse struct {
 
 // AddCommentRequest is the request body for adding a comment.
 type AddCommentRequest struct {
-	Body *ADFDoc `json:"body"`
+	Body interface{} `json:"body"`
 }
 
 // --- Pagination helper ---

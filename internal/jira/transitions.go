@@ -3,11 +3,15 @@ package jira
 import (
 	"encoding/json"
 	"fmt"
+	"net/url"
 )
 
 // GetTransitions returns the available workflow transitions for an issue.
 func (c *Client) GetTransitions(issueKey string) ([]Transition, error) {
-	data, err := c.Get(c.apiPathFor("issue", issueKey, "transitions"), nil)
+	q := url.Values{}
+	q.Set("expand", "transitions.fields")
+
+	data, err := c.Get(c.apiPathFor("issue", issueKey, "transitions"), q)
 	if err != nil {
 		return nil, fmt.Errorf("GetTransitions %s: %w", issueKey, err)
 	}

@@ -643,6 +643,15 @@ func TestGetTransitions(t *testing.T) {
 					ID:   "21",
 					Name: "Done",
 					To:   Status{ID: "5", Name: "Done"},
+					Fields: map[string]TransitionField{
+						"resolution": {
+							Required: true,
+							Name:     "Resolution",
+							AllowedValues: []TransitionOption{
+								{ID: "10000", Name: "Done"},
+							},
+						},
+					},
 				},
 			},
 		})
@@ -662,6 +671,12 @@ func TestGetTransitions(t *testing.T) {
 	}
 	if transitions[0].To.Name != "In Progress" {
 		t.Errorf("transitions[0].To.Name = %q, want 'In Progress'", transitions[0].To.Name)
+	}
+	if !transitions[1].Fields["resolution"].Required {
+		t.Errorf("transitions[1].Fields[resolution].Required = false, want true")
+	}
+	if got := transitions[1].Fields["resolution"].AllowedValues[0].Name; got != "Done" {
+		t.Errorf("transitions[1].Fields[resolution].AllowedValues[0].Name = %q, want 'Done'", got)
 	}
 }
 
@@ -942,6 +957,44 @@ func TestAddComment(t *testing.T) {
 	}
 	if body["type"] != "doc" {
 		t.Errorf("body.type = %v, want 'doc'", body["type"])
+	}
+}
+
+func TestAddComment_ServerUsesPlainStringBody(t *testing.T) {
+	var gotBody map[string]interface{}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "POST" || r.URL.Path != "/rest/api/2/issue/PROJ-1/comment" {
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+		data, _ := io.ReadAll(r.Body)
+		json.Unmarshal(data, &gotBody)
+
+		w.WriteHeader(http.StatusCreated)
+		w.Write([]byte(`{"id":"10002","created":"2026-01-01T10:00:00.000+0000","body":"Server comment"}`))
+	}))
+	defer srv.Close()
+
+	c := &Client{
+		baseURL:      srv.URL,
+		authHeader:   "Bearer test-token",
+		httpClient:   srv.Client(),
+		instanceType: InstanceServer,
+	}
+
+	comment, err := c.AddComment("PROJ-1", NewADFText("Server comment"))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if comment.ID != "10002" {
+		t.Errorf("comment.ID = %q, want '10002'", comment.ID)
+	}
+
+	body, ok := gotBody["body"].(string)
+	if !ok {
+		t.Fatalf("body type = %T, want string", gotBody["body"])
+	}
+	if body != "Server comment" {
+		t.Errorf("body = %q, want %q", body, "Server comment")
 	}
 }
 

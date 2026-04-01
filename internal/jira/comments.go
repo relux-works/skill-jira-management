@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/url"
 	"strconv"
+	"strings"
 )
 
 // --- ADF body builders ---
@@ -150,18 +151,33 @@ func NewADFCodeBlock(code string, language string) *ADFDoc {
 
 // AddComment adds a comment to an issue.
 func (c *Client) AddComment(issueKey string, body *ADFDoc) (*Comment, error) {
-	req := AddCommentRequest{Body: body}
+	var bodyPayload interface{} = body
+	if c.instanceType == InstanceServer {
+		bodyPayload = strings.TrimRight(extractADFText(body), "\n")
+	}
+
+	req := AddCommentRequest{Body: bodyPayload}
 
 	data, err := c.Post(c.apiPathFor("issue", issueKey, "comment"), &req)
 	if err != nil {
 		return nil, fmt.Errorf("AddComment %s: %w", issueKey, err)
 	}
 
-	var comment Comment
-	if err := json.Unmarshal(data, &comment); err != nil {
+	var commentMeta struct {
+		ID      string `json:"id,omitempty"`
+		Self    string `json:"self,omitempty"`
+		Created string `json:"created,omitempty"`
+		Updated string `json:"updated,omitempty"`
+	}
+	if err := json.Unmarshal(data, &commentMeta); err != nil {
 		return nil, fmt.Errorf("AddComment %s: failed to unmarshal: %w", issueKey, err)
 	}
-	return &comment, nil
+	return &Comment{
+		ID:      commentMeta.ID,
+		Self:    commentMeta.Self,
+		Created: commentMeta.Created,
+		Updated: commentMeta.Updated,
+	}, nil
 }
 
 // ListComments returns comments on an issue with offset-based pagination.

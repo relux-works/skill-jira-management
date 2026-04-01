@@ -2,10 +2,10 @@
 done
 
 ## Assigned To
-(none)
+codex
 
 ## Created
-2026-02-12T11:39:18Z
+2026-04-01T14:59:09Z
 
 ## Last Update
 2026-04-01T15:12:28Z
@@ -14,13 +14,12 @@ done
 - (none)
 
 ## Blocks
-- EPIC-260212-1lc5rd
+- (none)
 
 ## Checklist
 (empty)
 
 ## Notes
-Research: .research/260212_jira-cloud-rest-api.md — Jira Cloud REST API v3, auth, endpoints, ADF, pagination, Go libraries, rate limits
 
 ## Precondition Resources
 (none)
