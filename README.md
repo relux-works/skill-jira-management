@@ -20,7 +20,7 @@ Skill (SKILL.md) → CLI (jira-mgmt) → Library (internal/) → Jira Cloud REST
 ## Setup
 
 ```bash
-# Build binary, create symlinks
+# Build binary and install runtime artifacts
 ./scripts/setup.sh
 
 # Authenticate with Jira Cloud
@@ -33,10 +33,10 @@ jira-mgmt config set project YOUR-KEY
 ### Deinit
 
 ```bash
-# Remove symlinks (keep config)
+# Remove installed artifacts (keep config)
 ./scripts/deinit.sh
 
-# Remove symlinks + config
+# Remove installed artifacts + config
 ./scripts/deinit.sh --purge
 ```
 
@@ -79,6 +79,7 @@ jira-mgmt create --type epic --summary "New feature" --project KEY
 jira-mgmt create --type story --summary "Auth flow" --parent PROJ-10
 jira-mgmt create --type task --summary "Implement login" --parent PROJ-11
 jira-mgmt transition PROJ-123 --to "In Progress"
+jira-mgmt cancel PROJ-123 --reason "прекращение работы с ICONIA"
 jira-mgmt comment PROJ-123 --body "Done, ready for review"
 jira-mgmt dod PROJ-123 --set "- Unit tests\n- Code review\n- Docs updated"
 ```
@@ -136,15 +137,16 @@ UPDATE_SNAPSHOTS=1 go test ./... -v                # Update golden files
 | `jira-mgmt` | CLI for Jira Cloud | `jira-mgmt --help` |
 | `go test` | Run tests | `go test ./... -v` |
 | `task-board` | Project management board | `task-board summary` |
-| `scripts/setup.sh` | Build and install | `./scripts/setup.sh` |
+| `scripts/setup.sh` | Build and install runtime artifacts | `./scripts/setup.sh` |
 | `scripts/deinit.sh` | Uninstall | `./scripts/deinit.sh [--purge]` |
 
 ## Config Location
 
 - **Config:** `~/.config/jira-mgmt/config.yaml` (global, per-user)
 - **Credentials:** OS keychain (macOS Keychain, Linux Secret Service)
-- **Binary:** `~/.local/bin/jira-mgmt` (symlink)
-- **Skill:** `~/.claude/skills/jira-management` + `~/.codex/skills/jira-management` (symlinks)
+- **Binary:** `~/.local/bin/jira-mgmt` (standalone installed copy)
+- **Installed skill artifact:** `~/.agents/skills/jira-management` (degitized runtime copy)
+- **Skill entrypoints:** `~/.claude/skills/jira-management` + `~/.codex/skills/jira-management` (symlinks to the installed artifact)
 
 ## License
 

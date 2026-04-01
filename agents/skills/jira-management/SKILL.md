@@ -109,6 +109,9 @@ jira-mgmt create --type story --summary "Login UI" --project PROJ
 # Transition
 jira-mgmt transition PROJ-123 --to "In Progress"
 
+# Cancel with reason
+jira-mgmt cancel PROJ-123 --reason "прекращение работы с ICONIA"
+
 # Comment
 jira-mgmt comment PROJ-123 --body "Started work"
 
@@ -155,6 +158,7 @@ jira-mgmt dod PROJ-123 --set "Tests pass\nCode reviewed"
 ### Update
 - `jira-mgmt update ISSUE-KEY --summary "..." --description "..."` — update issue fields
 - `jira-mgmt transition ISSUE-KEY --to "Status Name"` — move to status
+- `jira-mgmt cancel ISSUE-KEY --reason "..."` — cancel an issue with workflow-aware required fields
 - `jira-mgmt comment ISSUE-KEY --body "text"` — add comment
 - `jira-mgmt dod ISSUE-KEY --set "criteria"` — set Definition of Done
 
@@ -189,6 +193,11 @@ jira-mgmt grep -i "performance"
 jira-mgmt transition PROJ-123 --to "Done"
 ```
 
+**User:** "Cancel PROJ-123 because work with the vendor stopped"
+```bash
+jira-mgmt cancel PROJ-123 --reason "прекращение работы с ICONIA"
+```
+
 ### Read Operations: Use DSL
 
 Prefer DSL over JQL for token efficiency.
@@ -209,6 +218,7 @@ Always use explicit CLI commands for modifications:
 ```bash
 jira-mgmt create --type story --summary "..." --project PROJ
 jira-mgmt transition PROJ-123 --to "In Progress"
+jira-mgmt cancel PROJ-123 --reason "..."
 jira-mgmt comment PROJ-123 --body "..."
 ```
 

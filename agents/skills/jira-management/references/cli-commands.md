@@ -356,6 +356,31 @@ jira-mgmt transition PROJ-123 --to "Done"
 
 ---
 
+### jira-mgmt cancel
+
+Cancel issue using the workflow `Cancel` transition with best-effort required field handling.
+
+**Syntax:**
+```bash
+jira-mgmt cancel ISSUE-KEY [--reason "text"] [--cascade-subtasks]
+```
+
+**Examples:**
+```bash
+# Cancel issue with a reason comment
+jira-mgmt cancel PROJ-123 --reason "прекращение работы с ICONIA"
+
+# Cancel parent after direct subtasks
+jira-mgmt cancel PROJ-123 --reason "прекращение работы с ICONIA" --cascade-subtasks
+```
+
+**Notes:**
+- Automatically fills common cancel requirements such as `resolution=Отменено`
+- Falls back to `Другое`/`Other` for workflow select fields when no exact reason option exists
+- Returns Jira workflow errors verbatim when an external blocker still prevents cancel
+
+---
+
 ### jira-mgmt comment
 
 Add comment to issue.
