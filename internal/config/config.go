@@ -9,11 +9,12 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// defaultConfigDir is the base directory for jira-mgmt configuration.
-const defaultConfigDir = ".config/jira-mgmt"
-
-// defaultConfigFile is the config file name within the config directory.
-const defaultConfigFile = "config.yaml"
+const (
+	AppName                = "jira-mgmt"
+	defaultConfigFileName  = "config.yaml"
+	defaultAuthFileName    = "auth.json"
+	defaultInstallFileName = "install.json"
+)
 
 // Locale represents the supported locale for Jira content.
 type Locale string
@@ -25,13 +26,14 @@ const (
 
 // Config holds the global user configuration for jira-mgmt.
 type Config struct {
-	ActiveProject  string `yaml:"active_project"`
-	ActiveBoard    int    `yaml:"active_board"`
-	Locale         Locale `yaml:"locale"`
-	InstanceURL    string `yaml:"instance_url,omitempty"`
-	InstanceType   string `yaml:"instance_type,omitempty"`    // "cloud" or "server"
-	AuthType       string `yaml:"auth_type,omitempty"`        // "basic" or "bearer"
-	TLSSkipVerify  bool   `yaml:"tls_skip_verify,omitempty"` // skip TLS certificate verification (corporate CAs)
+	ActiveProject string `yaml:"active_project"`
+	ActiveBoard   int    `yaml:"active_board"`
+	Locale        Locale `yaml:"locale"`
+
+	InstanceURL   string `yaml:"instance_url,omitempty"`
+	InstanceType  string `yaml:"instance_type,omitempty"`   // "cloud" or "server"
+	AuthType      string `yaml:"auth_type,omitempty"`       // "basic" or "bearer"
+	TLSSkipVerify bool   `yaml:"tls_skip_verify,omitempty"` // skip TLS certificate verification (corporate CAs)
 }
 
 // DefaultConfig returns a Config with sensible defaults.
@@ -41,20 +43,53 @@ func DefaultConfig() Config {
 	}
 }
 
+// ConfigDir returns the per-user config directory for jira-mgmt.
+func ConfigDir() (string, error) {
+	baseDir, err := os.UserConfigDir()
+	if err != nil {
+		return "", fmt.Errorf("getting user config dir: %w", err)
+	}
+	return filepath.Join(baseDir, AppName), nil
+}
+
+// DefaultConfigPath returns the default config YAML path.
+func DefaultConfigPath() (string, error) {
+	configDir, err := ConfigDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(configDir, defaultConfigFileName), nil
+}
+
+// AuthConfigPath returns the global auth file path.
+func AuthConfigPath() (string, error) {
+	configDir, err := ConfigDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(configDir, defaultAuthFileName), nil
+}
+
+// InstallStatePath returns the install-state metadata path.
+func InstallStatePath() (string, error) {
+	configDir, err := ConfigDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(configDir, defaultInstallFileName), nil
+}
+
 // ConfigManager handles reading and writing the config file.
 type ConfigManager struct {
-	// configPath is the full path to the config YAML file.
 	configPath string
 }
 
-// NewConfigManager creates a ConfigManager with the default config path (~/.config/jira-mgmt/config.yaml).
+// NewConfigManager creates a ConfigManager with the default config path.
 func NewConfigManager() (*ConfigManager, error) {
-	home, err := os.UserHomeDir()
+	configPath, err := DefaultConfigPath()
 	if err != nil {
-		return nil, fmt.Errorf("getting home directory: %w", err)
+		return nil, err
 	}
-
-	configPath := filepath.Join(home, defaultConfigDir, defaultConfigFile)
 	return &ConfigManager{configPath: configPath}, nil
 }
 

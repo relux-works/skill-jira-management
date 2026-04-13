@@ -8,13 +8,16 @@ import (
 	"github.com/zalando/go-keyring"
 )
 
-// getCredentialStore returns the keychain-backed credential store.
-// Uses a mock keyring for testing when overridden.
-var getCredentialStore = func() config.CredentialStore {
-	return config.NewKeychainStore(
-		keyring.Set,
-		keyring.Get,
-		keyring.Delete,
+// getCredentialResolver returns the platform-aware credential resolver.
+// Tests can override it.
+var getCredentialResolver = func() *config.Resolver {
+	return config.NewResolver(
+		config.Runtime{},
+		config.NewKeychainStore(
+			keyring.Set,
+			keyring.Get,
+			keyring.Delete,
+		),
 	)
 }
 
@@ -30,22 +33,37 @@ func buildJiraClientFromConfig() (*jira.Client, error) {
 		return nil, fmt.Errorf("reading config: %w", err)
 	}
 
-	if cfg.InstanceURL == "" {
-		return nil, fmt.Errorf("not configured: run 'jira-mgmt auth' first")
+	resolver := getCredentialResolver()
+	instanceURL := resolver.ResolveInstanceURL(cfg.InstanceURL)
+	if instanceURL == "" {
+		return nil, fmt.Errorf("not configured: run 'jira-mgmt auth set-access' first")
 	}
 
-	store := getCredentialStore()
-	creds, err := store.Load(cfg.InstanceURL)
+	resolved, err := resolver.Resolve(config.SourceAuto, instanceURL)
 	if err != nil {
-		return nil, fmt.Errorf("loading credentials: %w (run 'jira-mgmt auth' to configure)", err)
+		return nil, fmt.Errorf("loading credentials: %w (run 'jira-mgmt auth set-access' to configure)", err)
 	}
 
-	return jira.NewClient(jira.Config{
-		BaseURL:            creds.InstanceURL,
-		Email:              creds.Email,
-		Token:              creds.APIToken,
+	client, err := jira.NewClient(jira.Config{
+		BaseURL:            resolved.Credentials.InstanceURL,
+		Email:              resolved.Credentials.Email,
+		Token:              resolved.Credentials.APIToken,
 		InstanceType:       jira.InstanceType(cfg.InstanceType),
-		AuthType:           jira.AuthType(cfg.AuthType),
+		AuthType:           jira.AuthType(resolved.Credentials.AuthType),
 		InsecureSkipVerify: flagInsecure || cfg.TLSSkipVerify,
 	})
+	if err != nil {
+		return nil, err
+	}
+
+	if cfg.InstanceType == "" {
+		if instanceType, err := client.DetectInstanceType(); err == nil {
+			_ = cfgMgr.SetInstanceType(string(instanceType))
+		}
+	}
+	if cfg.AuthType == "" && resolved.ResolvedFrom != "env" {
+		_ = cfgMgr.SetAuthType(resolved.Credentials.AuthType)
+	}
+
+	return client, nil
 }

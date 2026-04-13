@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 
@@ -31,11 +32,11 @@ func main() {
 }
 
 var rootCmd = &cobra.Command{
-	Use:   "jira-mgmt",
-	Short: "Jira management CLI for AI agents",
-	Long:  "Agent-facing CLI for Jira Cloud: DSL queries, scoped grep, and write commands.",
-	SilenceUsage:  true,
-	SilenceErrors: true,
+	Use:               "jira-mgmt",
+	Short:             "Jira management CLI for AI agents",
+	Long:              "Agent-facing CLI for Jira Cloud: DSL queries, scoped grep, and write commands.",
+	SilenceUsage:      true,
+	SilenceErrors:     true,
 	PersistentPreRunE: persistentPreRun,
 }
 
@@ -59,13 +60,26 @@ func init() {
 func persistentPreRun(cmd *cobra.Command, args []string) error {
 	loadConfigDefaults(cmd)
 
-	// Skip first-run check for commands that don't need auth.
-	name := cmd.Name()
-	if name == "version" || name == "auth" || name == "config" || name == "set" || name == "show" || name == "help" || name == "jira-mgmt" {
+	if shouldSkipAuthCheck(cmd) {
 		return nil
 	}
 
 	return checkFirstRun()
+}
+
+func shouldSkipAuthCheck(cmd *cobra.Command) bool {
+	if cmd == nil || cmd.Name() == "jira-mgmt" {
+		return true
+	}
+
+	for current := cmd; current != nil; current = current.Parent() {
+		switch current.Name() {
+		case "auth", "config", "help", "completion", "version":
+			return true
+		}
+	}
+
+	return false
 }
 
 // loadConfigDefaults fills global flags from config when not set explicitly via CLI.
@@ -100,9 +114,13 @@ func checkFirstRun() error {
 		return nil
 	}
 
-	if cfg.InstanceURL == "" {
-		return fmt.Errorf("jira-mgmt is not configured\nRun 'jira-mgmt auth' to set up authentication")
+	resolver := getCredentialResolver()
+	instanceURL := resolver.ResolveInstanceURL(cfg.InstanceURL)
+	if _, err := resolver.Resolve(config.SourceAuto, instanceURL); err == nil {
+		return nil
+	} else if errors.Is(err, config.ErrCredentialsNotFound) || errors.Is(err, config.ErrInstanceURLRequired) {
+		return fmt.Errorf("jira-mgmt is not configured\nRun 'jira-mgmt auth set-access' to set up authentication")
+	} else {
+		return err
 	}
-
-	return nil
 }

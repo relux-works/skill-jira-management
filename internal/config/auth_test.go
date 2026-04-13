@@ -2,6 +2,7 @@ package config
 
 import (
 	"errors"
+	"path/filepath"
 	"testing"
 )
 
@@ -72,8 +73,8 @@ func TestCredentials_Validate(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name:    "missing email",
-			creds:   Credentials{InstanceURL: "https://x.atlassian.net", APIToken: "tok"},
+			name:    "missing email for basic auth",
+			creds:   Credentials{InstanceURL: "https://x.atlassian.net", APIToken: "tok", AuthType: "basic"},
 			wantErr: true,
 		},
 		{
@@ -335,5 +336,108 @@ func TestKeychainStore_LegacyNotUsedWhenNewExists(t *testing.T) {
 	// Should use new, not legacy
 	if loaded.APIToken != "new-token" {
 		t.Errorf("APIToken = %q, want %q (should prefer new over legacy)", loaded.APIToken, "new-token")
+	}
+}
+
+func TestDefaultSourceForGOOS(t *testing.T) {
+	tests := []struct {
+		goos string
+		want Source
+	}{
+		{goos: "darwin", want: SourceKeychain},
+		{goos: "windows", want: SourceKeychain},
+		{goos: "linux", want: SourceEnvOrFile},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.goos, func(t *testing.T) {
+			if got := DefaultSourceForGOOS(tt.goos); got != tt.want {
+				t.Fatalf("DefaultSourceForGOOS(%q) = %q, want %q", tt.goos, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestFileStore_SaveLoadDelete(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "auth.json")
+	store := NewFileStore(path)
+	creds := validCreds()
+
+	if err := store.Save(creds); err != nil {
+		t.Fatalf("Save() error = %v", err)
+	}
+
+	loaded, err := store.Load(creds.InstanceURL)
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if loaded.InstanceURL != creds.InstanceURL {
+		t.Fatalf("InstanceURL = %q, want %q", loaded.InstanceURL, creds.InstanceURL)
+	}
+	if loaded.Email != creds.Email {
+		t.Fatalf("Email = %q, want %q", loaded.Email, creds.Email)
+	}
+	if loaded.APIToken != creds.APIToken {
+		t.Fatalf("APIToken = %q, want %q", loaded.APIToken, creds.APIToken)
+	}
+
+	if err := store.Delete(creds.InstanceURL); err != nil {
+		t.Fatalf("Delete() error = %v", err)
+	}
+
+	if _, err := store.Load(creds.InstanceURL); !errors.Is(err, ErrCredentialsNotFound) {
+		t.Fatalf("Load() after Delete() error = %v, want ErrCredentialsNotFound", err)
+	}
+}
+
+func TestResolverResolveAutoFallsBackToFileOnWindows(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "auth.json")
+	store := NewFileStore(path)
+	creds := validCreds()
+	if err := store.Save(creds); err != nil {
+		t.Fatalf("Save() error = %v", err)
+	}
+
+	resolver := NewResolverWithAuthFilePath(Runtime{
+		GOOS:   "windows",
+		Getenv: func(string) string { return "" },
+	}, nil, path)
+
+	resolved, err := resolver.Resolve(SourceAuto, creds.InstanceURL)
+	if err != nil {
+		t.Fatalf("Resolve() error = %v", err)
+	}
+	if resolved.Source != SourceEnvOrFile {
+		t.Fatalf("Source = %q, want %q", resolved.Source, SourceEnvOrFile)
+	}
+	if resolved.ResolvedFrom != "file" {
+		t.Fatalf("ResolvedFrom = %q, want file", resolved.ResolvedFrom)
+	}
+}
+
+func TestResolverResolveAutoFallsBackToEnvOnDarwin(t *testing.T) {
+	creds := validCreds()
+	env := map[string]string{
+		EnvInstanceURL: creds.InstanceURL,
+		EnvEmail:       creds.Email,
+		EnvAPIToken:    creds.APIToken,
+	}
+
+	resolver := NewResolverWithAuthFilePath(Runtime{
+		GOOS: "darwin",
+		Getenv: func(key string) string {
+			return env[key]
+		},
+	}, nil, filepath.Join(t.TempDir(), "auth.json"))
+
+	resolved, err := resolver.Resolve(SourceAuto, "")
+	if err != nil {
+		t.Fatalf("Resolve() error = %v", err)
+	}
+	if resolved.Source != SourceEnvOrFile {
+		t.Fatalf("Source = %q, want %q", resolved.Source, SourceEnvOrFile)
+	}
+	if resolved.ResolvedFrom != "env" {
+		t.Fatalf("ResolvedFrom = %q, want env", resolved.ResolvedFrom)
 	}
 }
