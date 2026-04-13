@@ -6,7 +6,7 @@ Complete reference for `jira-mgmt` CLI commands with all options and examples.
 
 ## Authentication & Configuration
 
-### jira-mgmt auth
+### jira-mgmt auth / auth set-access
 
 Authentication setup. Supports both interactive and non-interactive (agent-friendly) modes.
 
@@ -17,6 +17,11 @@ jira-mgmt auth --instance https://mycompany.atlassian.net --email user@company.c
 
 # Server/DC (Bearer auth — Personal Access Token, no email)
 jira-mgmt auth --instance https://jira.company.com --token PAT_TOKEN
+```
+
+Equivalent explicit command:
+```bash
+jira-mgmt auth set-access --instance https://mycompany.atlassian.net --email user@company.com --token API_TOKEN
 ```
 
 **Interactive (prompts for input):**
@@ -33,16 +38,18 @@ jira-mgmt auth
 - Email provided → Basic auth (Cloud: `base64(email:token)`)
 - No email → Bearer auth (Server/DC: `Bearer <token>`)
 
-**Instance type detection:**
-During auth, the CLI probes `/rest/api/2/serverInfo` to auto-detect Cloud vs Server/DC. This determines which API version (v2/v3) and pagination style to use.
+**Validation:**
+Use `jira-mgmt auth whoami` as the canonical live auth probe. Add `--check=false` to inspect local resolution without hitting Jira.
 
 **Storage:**
-- Credentials: OS keychain (macOS Keychain / Linux Secret Service)
-- Config: `~/.config/jira-mgmt/config.yaml`
+- Credential source names: `auto`, `keychain`, `env_or_file`
+- `auto` defaults to system keychain on macOS and Windows
+- Fallback auth file: `os.UserConfigDir()/jira-mgmt/auth.json`
+- Config: `os.UserConfigDir()/jira-mgmt/config.yaml`
 
 **What gets saved:**
 - `instance_url` — Jira base URL
-- `instance_type` — `cloud` or `server` (auto-detected)
+- `instance_type` — `cloud` or `server` (detected by `auth whoami` or first live client use)
 - `auth_type` — `basic` or `bearer` (auto-determined)
 
 **Notes:**
@@ -50,6 +57,41 @@ During auth, the CLI probes `/rest/api/2/serverInfo` to auto-detect Cloud vs Ser
 - Server/DC: create PAT in Jira → Profile → Personal Access Tokens
 - Corporate Jira behind SSO/OAuth proxy may require VPN for API access
 - One-time setup per environment
+
+### jira-mgmt auth whoami
+
+Show resolved Jira auth state and optionally validate it against the live API.
+
+```bash
+jira-mgmt auth whoami
+jira-mgmt auth whoami --check=false
+```
+
+### jira-mgmt auth resolve
+
+Show which backend would provide credentials without printing the token.
+
+```bash
+jira-mgmt auth resolve
+jira-mgmt auth resolve --source env_or_file
+```
+
+### jira-mgmt auth clean
+
+Remove stored credentials for the selected instance.
+
+```bash
+jira-mgmt auth clean
+jira-mgmt auth clean --instance https://jira.company.com
+```
+
+### jira-mgmt auth config-path
+
+Print the global `auth.json` path used by the `env_or_file` backend.
+
+```bash
+jira-mgmt auth config-path
+```
 
 ---
 

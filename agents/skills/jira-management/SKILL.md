@@ -57,9 +57,9 @@ triggers:
 
 # Jira Management Skill
 
-**Purpose:** Agent-agnostic skill (Claude Code / Codex CLI) for managing Jira (Cloud & Server/DC) via `jira-mgmt` CLI. Instance type is auto-detected during `auth`.
+**Purpose:** Agent-agnostic skill (Claude Code / Codex CLI) for managing Jira (Cloud & Server/DC) via `jira-mgmt` CLI. Instance type is auto-detected during `auth whoami` and on first live client use.
 
-**Tool:** `jira-mgmt` (installed via `scripts/setup.sh`)
+**Tool:** `jira-mgmt` (installed via `./setup.sh` or `.\setup.ps1`)
 
 ---
 
@@ -69,16 +69,25 @@ triggers:
 
 **Cloud (email + API token → Basic auth):**
 ```bash
-jira-mgmt auth --instance https://mycompany.atlassian.net --email user@company.com --token API_TOKEN
+jira-mgmt auth set-access --instance https://mycompany.atlassian.net --email user@company.com --token API_TOKEN
 ```
 
 **Server/DC (Personal Access Token → Bearer auth):**
 ```bash
-jira-mgmt auth --instance https://jira.company.com --token PAT_TOKEN
+jira-mgmt auth set-access --instance https://jira.company.com --token PAT_TOKEN
 ```
 
 Auth type is auto-determined: email provided → Basic (Cloud), no email → Bearer (Server/DC PAT).
-Instance type (Cloud vs Server/DC) is auto-detected via `/rest/api/2/serverInfo` during auth.
+Credential source names are stable across platforms: `auto`, `keychain`, `env_or_file`.
+
+```bash
+# Validate the stored credentials and detect instance type
+jira-mgmt auth whoami
+
+# Optional debug helpers
+jira-mgmt auth resolve
+jira-mgmt auth config-path
+```
 
 ```bash
 # Set active project/board/locale
@@ -124,9 +133,14 @@ jira-mgmt dod PROJ-123 --set "Tests pass\nCode reviewed"
 ## Commands Overview
 
 ### Authentication & Config
-- `jira-mgmt auth` — interactive setup; or non-interactive with flags:
-  - Cloud: `jira-mgmt auth --instance URL --email EMAIL --token API_TOKEN`
-  - Server/DC: `jira-mgmt auth --instance URL --token PAT` (no email = Bearer auth)
+- `jira-mgmt auth set-access` — store credentials in the default backend for the platform:
+  - Cloud: `jira-mgmt auth set-access --instance URL --email EMAIL --token API_TOKEN`
+  - Server/DC: `jira-mgmt auth set-access --instance URL --token PAT`
+- `jira-mgmt auth whoami` — canonical live auth probe; use `--check=false` for local inspection only
+- `jira-mgmt auth resolve` — show where credentials resolve from without printing the token
+- `jira-mgmt auth clean` — remove stored credentials for the selected instance
+- `jira-mgmt auth config-path` — print the global `auth.json` path
+- `jira-mgmt auth` — compatibility alias for `auth set-access`
 - `jira-mgmt config set <key> <value>` — set project/board/locale
 - `jira-mgmt config show` — display current config (includes instance type, auth type)
 

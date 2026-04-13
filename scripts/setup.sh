@@ -6,95 +6,210 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 SKILL_NAME="jira-management"
 SKILL_CONTENT_DIR="$PROJECT_ROOT/agents/skills/$SKILL_NAME"
+BINARY_NAME="jira-mgmt"
+BIN_DIR="${JIRA_MGMT_BIN_DIR:-$HOME/.local/bin}"
+INSTALL_ONLY="${JIRA_MGMT_INSTALL_ONLY:-0}"
 
 AGENTS_DIR="$HOME/.agents/skills"
 CLAUDE_DIR="$HOME/.claude/skills"
 CODEX_DIR="$HOME/.codex/skills"
-BIN_DIR="$HOME/.local/bin"
 INSTALLED_SKILL_DIR="$AGENTS_DIR/$SKILL_NAME"
-INSTALLED_BIN="$BIN_DIR/jira-mgmt"
+INSTALLED_BIN="$BIN_DIR/$BINARY_NAME"
+
+BUILD_VERSION="dev"
+BUILD_COMMIT="unknown"
+BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+BUILD_LDFLAGS=""
 
 ARTIFACT_DIR="$(mktemp -d "${TMPDIR:-/tmp}/jira-management-setup.XXXXXX")"
 ARTIFACT_SKILL_DIR="$ARTIFACT_DIR/skill"
-ARTIFACT_BIN="$ARTIFACT_DIR/jira-mgmt"
+ARTIFACT_BIN="$ARTIFACT_DIR/$BINARY_NAME"
 
 cleanup() {
   rm -rf "$ARTIFACT_DIR"
 }
 
-prune_source_artifacts() {
-  local target="$1"
-
-  rm -rf \
-    "$target/.git" \
-    "$target/.task-board" \
-    "$target/.planning" \
-    "$target/.research" \
-    "$target/.spec" \
-    "$target/cmd" \
-    "$target/internal" \
-    "$target/scripts"
-
-  rm -f \
-    "$target/README.md" \
-    "$target/CLAUDE.md" \
-    "$target/LICENSE" \
-    "$target/NOTICE" \
-    "$target/go.mod" \
-    "$target/go.sum" \
-    "$target/jira-mgmt" \
-    "$target/task-board.config.json"
-}
-
 trap cleanup EXIT
 
-echo "=== $SKILL_NAME Setup ==="
+green() { printf '\033[32m%s\033[0m\n' "$1"; }
+yellow() { printf '\033[33m%s\033[0m\n' "$1"; }
+red() { printf '\033[31m%s\033[0m\n' "$1"; }
 
-# 1. Build binary artifact
-echo "Building jira-mgmt binary..."
-cd "$PROJECT_ROOT"
-go build -o "$ARTIFACT_BIN" ./cmd/jira-mgmt/
+json_escape() {
+  printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'
+}
 
-# 2. Stage a degitized skill artifact for global installs
-mkdir -p "$ARTIFACT_SKILL_DIR"
-rsync -a --delete "$SKILL_CONTENT_DIR/" "$ARTIFACT_SKILL_DIR/" --exclude='.git'
-prune_source_artifacts "$ARTIFACT_SKILL_DIR"
+config_dir() {
+  case "$(uname -s)" in
+    Darwin) printf '%s' "$HOME/Library/Application Support/jira-mgmt" ;;
+    *) printf '%s' "${XDG_CONFIG_HOME:-$HOME/.config}/jira-mgmt" ;;
+  esac
+}
 
-# 3. Install binary as a standalone artifact (not a source-linked symlink)
-mkdir -p "$BIN_DIR"
-rm -f "$INSTALLED_BIN"
-install -m 0755 "$ARTIFACT_BIN" "$INSTALLED_BIN"
-echo "  Binary copied -> $INSTALLED_BIN"
+usage() {
+  cat <<EOF
+Usage: scripts/setup.sh [options]
 
-# 4. Verify PATH
-if [[ ":$PATH:" != *":$BIN_DIR:"* ]]; then
-  echo "  WARNING: ~/.local/bin is not in your PATH"
+Options:
+  --bin-dir PATH       Install binary into PATH (default: $HOME/.local/bin)
+  --install-only       Safe reinstall of binary, skill artifact, links, and install metadata
+  --help, -h           Show this help
+EOF
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --bin-dir)
+      BIN_DIR="$2"
+      shift 2
+      ;;
+    --install-only)
+      INSTALL_ONLY="1"
+      shift
+      ;;
+    --help|-h)
+      usage
+      exit 0
+      ;;
+    *)
+      red "Unknown option: $1"
+      usage
+      exit 1
+      ;;
+  esac
+done
+
+install_go() {
+  if command -v go >/dev/null 2>&1; then
+    green "Go already installed: $(go version)"
+    return
+  fi
+
+  if [[ "$(uname -s)" != "Darwin" ]]; then
+    red "Go is missing. Install Go first, then rerun setup."
+    exit 1
+  fi
+
+  if ! command -v brew >/dev/null 2>&1; then
+    red "Go is missing and Homebrew is not available. Install Homebrew or Go first."
+    exit 1
+  fi
+
+  yellow "Go not found. Installing via Homebrew..."
+  brew install go
+  green "Go installed: $(go version)"
+}
+
+compute_ldflags() {
+  if git -C "$PROJECT_ROOT" rev-parse --git-dir >/dev/null 2>&1; then
+    BUILD_VERSION="$(git -C "$PROJECT_ROOT" describe --tags --always 2>/dev/null || echo "dev")"
+    BUILD_COMMIT="$(git -C "$PROJECT_ROOT" rev-parse --short HEAD 2>/dev/null || echo "unknown")"
+  fi
+
+  BUILD_LDFLAGS="-X main.version=$BUILD_VERSION -X main.commit=$BUILD_COMMIT -X main.date=$BUILD_DATE"
+}
+
+build_cli() {
+  green "Building $BINARY_NAME ..."
+  (
+    cd "$PROJECT_ROOT"
+    go build -trimpath -ldflags "$BUILD_LDFLAGS" -o "$ARTIFACT_BIN" ./cmd/jira-mgmt
+  )
+  green "Built artifact: $ARTIFACT_BIN"
+}
+
+install_binary() {
+  mkdir -p "$BIN_DIR"
+  cp "$ARTIFACT_BIN" "$INSTALLED_BIN"
+  chmod +x "$INSTALLED_BIN"
+  green "Installed binary: $INSTALLED_BIN"
+}
+
+install_skill_artifact() {
+  mkdir -p "$ARTIFACT_SKILL_DIR"
+  rsync -a --delete "$SKILL_CONTENT_DIR/" "$ARTIFACT_SKILL_DIR/" --exclude='.git'
+
+  mkdir -p "$INSTALLED_SKILL_DIR"
+  rsync -a --delete "$ARTIFACT_SKILL_DIR/" "$INSTALLED_SKILL_DIR/"
+  green "Installed skill artifact: $INSTALLED_SKILL_DIR"
+}
+
+refresh_links() {
+  mkdir -p "$CLAUDE_DIR" "$CODEX_DIR"
+  rm -rf "$CLAUDE_DIR/$SKILL_NAME" "$CODEX_DIR/$SKILL_NAME"
+  ln -s "$INSTALLED_SKILL_DIR" "$CLAUDE_DIR/$SKILL_NAME"
+  ln -s "$INSTALLED_SKILL_DIR" "$CODEX_DIR/$SKILL_NAME"
+  green "Refreshed Claude/Codex skill links"
+}
+
+write_install_state() {
+  local config_dir_path install_state_path escaped_repo escaped_skill escaped_bin escaped_platform escaped_arch escaped_version escaped_commit escaped_build_date
+  config_dir_path="$(config_dir)"
+  install_state_path="$config_dir_path/install.json"
+  mkdir -p "$config_dir_path"
+
+  escaped_repo="$(json_escape "$PROJECT_ROOT")"
+  escaped_skill="$(json_escape "$INSTALLED_SKILL_DIR")"
+  escaped_bin="$(json_escape "$BIN_DIR")"
+  escaped_platform="$(json_escape "$(uname -s | tr '[:upper:]' '[:lower:]')")"
+  escaped_arch="$(json_escape "$(uname -m)")"
+  escaped_version="$(json_escape "$BUILD_VERSION")"
+  escaped_commit="$(json_escape "$BUILD_COMMIT")"
+  escaped_build_date="$(json_escape "$BUILD_DATE")"
+
+  cat > "$install_state_path" <<EOF
+{
+  "repoPath": "$escaped_repo",
+  "installedSkillPath": "$escaped_skill",
+  "binDir": "$escaped_bin",
+  "platform": "$escaped_platform",
+  "arch": "$escaped_arch",
+  "version": "$escaped_version",
+  "commit": "$escaped_commit",
+  "buildDate": "$escaped_build_date",
+  "installOnly": $([[ "$INSTALL_ONLY" == "1" ]] && echo "true" || echo "false")
+}
+EOF
+  green "Install state: $install_state_path"
+}
+
+verify_install() {
+  [[ -x "$INSTALLED_BIN" ]] || { red "Missing installed binary: $INSTALLED_BIN"; exit 1; }
+  [[ -f "$INSTALLED_SKILL_DIR/SKILL.md" ]] || { red "Installed skill artifact is missing SKILL.md"; exit 1; }
+
+  local resolved=""
+  if resolved="$(command -v "$BINARY_NAME" 2>/dev/null)"; then
+    if [[ "$resolved" != "$INSTALLED_BIN" ]]; then
+      yellow "$BINARY_NAME on PATH resolves to $resolved"
+      yellow "Expected: $INSTALLED_BIN"
+    fi
+  else
+    yellow "$BIN_DIR is not in PATH yet."
+    yellow "Add to your shell profile: export PATH=\"\$HOME/.local/bin:\$PATH\""
+  fi
+
+  "$INSTALLED_BIN" version >/dev/null
+  "$INSTALLED_BIN" auth config-path >/dev/null
+  green "Verified binary and skill artifact"
+}
+
+printf "\n"
+green "=== jira-management setup ==="
+printf "\n"
+if [[ "$INSTALL_ONLY" == "1" ]]; then
+  yellow "Running safe reinstall flow (--install-only)"
 fi
 
-# 5. Copy skill into .agents/skills/ as an artifact copy
-echo "Installing skill: $SKILL_NAME"
-if [ -L "$INSTALLED_SKILL_DIR" ]; then
-  rm -f "$INSTALLED_SKILL_DIR"
-fi
-mkdir -p "$INSTALLED_SKILL_DIR"
-rsync -a --delete "$ARTIFACT_SKILL_DIR/" "$INSTALLED_SKILL_DIR/"
-echo "  Installed artifact -> $INSTALLED_SKILL_DIR/"
+install_go
+compute_ldflags
+build_cli
+install_binary
+install_skill_artifact
+refresh_links
+write_install_state
+verify_install
 
-# 6. Symlink from .claude/skills/ -> .agents/skills/
-mkdir -p "$CLAUDE_DIR"
-rm -f "$CLAUDE_DIR/$SKILL_NAME"
-ln -s "$AGENTS_DIR/$SKILL_NAME" "$CLAUDE_DIR/$SKILL_NAME"
-echo "  Symlink -> $CLAUDE_DIR/$SKILL_NAME"
-
-# 7. Symlink from .codex/skills/ -> .agents/skills/
-mkdir -p "$CODEX_DIR"
-rm -f "$CODEX_DIR/$SKILL_NAME"
-ln -s "$AGENTS_DIR/$SKILL_NAME" "$CODEX_DIR/$SKILL_NAME"
-echo "  Symlink -> $CODEX_DIR/$SKILL_NAME"
-
-echo ""
-echo "Done. Installed $(git -C "$PROJECT_ROOT" describe --tags --always 2>/dev/null || echo 'unknown')"
-echo ""
-echo "Next steps:"
-echo "  jira-mgmt auth"
-echo "  jira-mgmt config set project YOUR-KEY"
+printf "\n"
+green "Next steps:"
+printf "  jira-mgmt auth set-access --instance URL --email EMAIL --token TOKEN\n"
+printf "  jira-mgmt auth whoami\n"

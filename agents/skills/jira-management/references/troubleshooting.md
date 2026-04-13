@@ -9,7 +9,8 @@ Common issues and solutions when working with `jira-mgmt` CLI.
 **Problem:** `401 Unauthorized`
 **Solution:**
 ```bash
-jira-mgmt auth
+jira-mgmt auth set-access --instance URL --email EMAIL --token TOKEN
+jira-mgmt auth whoami
 jira-mgmt config show
 ```
 

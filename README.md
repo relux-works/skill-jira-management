@@ -1,30 +1,37 @@
 # jira-management
 
-CLI tool + Claude Code skill for working with Jira Cloud projects.
+CLI tool + agent skill for working with Jira Cloud and Server/DC projects.
 
 ## Architecture
 
 ```
-Skill (SKILL.md) → CLI (jira-mgmt) → Library (internal/) → Jira Cloud REST API v3
+Skill (SKILL.md) → CLI (jira-mgmt) → Library (internal/) → Jira REST API
 ```
 
 **Monorepo** with three components:
 
 | Component | Location | Purpose |
 |-----------|----------|---------|
-| Go library | `internal/jira/` | Jira Cloud REST API v3 client |
-| Config | `internal/config/` | Keychain auth storage + YAML config |
+| Go library | `internal/jira/` | Jira Cloud + Server/DC REST client |
+| Config | `internal/config/` | Cross-platform auth resolution + YAML config |
 | CLI tool | `cmd/jira-mgmt/` | Agents-facing CLI with DSL query layer |
 | Skill | `agents/skills/jira-management/` | Claude Code / Codex skill |
 
 ## Setup
 
 ```bash
-# Build binary and install runtime artifacts
-./scripts/setup.sh
+# macOS / Linux shells
+./setup.sh
 
-# Authenticate with Jira Cloud
-jira-mgmt auth
+# Windows PowerShell
+.\setup.ps1
+
+# Verify installed binary
+jira-mgmt version
+
+# Store credentials and validate them
+jira-mgmt auth set-access --instance https://mycompany.atlassian.net --email user@company.com --token API_TOKEN
+jira-mgmt auth whoami
 
 # Set active project
 jira-mgmt config set project YOUR-KEY
@@ -45,7 +52,12 @@ jira-mgmt config set project YOUR-KEY
 ### Auth & Config
 
 ```bash
-jira-mgmt auth                        # Interactive setup: instance URL, email, API token
+jira-mgmt auth set-access --instance URL --email EMAIL --token TOKEN
+jira-mgmt auth whoami                  # Canonical live auth probe
+jira-mgmt auth resolve                 # Show where credentials resolve from
+jira-mgmt auth clean                   # Remove stored credentials
+jira-mgmt auth config-path             # Print global auth.json path
+jira-mgmt auth                         # Compatibility alias for set-access
 jira-mgmt config set project KEY       # Set active project
 jira-mgmt config set board 42          # Set active board
 jira-mgmt config set locale en         # Set locale (en/ru)
@@ -110,10 +122,12 @@ UPDATE_SNAPSHOTS=1 go test ./... -v                # Update golden files
 ├── cmd/jira-mgmt/          # CLI entry point + commands
 ├── internal/
 │   ├── jira/               # Jira Cloud API client library
-│   ├── config/             # Auth (keychain) + config (YAML)
+│   ├── config/             # Auth resolution + config (YAML/JSON)
 │   ├── query/              # DSL parser & executor
 │   ├── fields/             # Field selection & projection
 │   └── search/             # Scoped grep
+├── setup.sh                # Root wrapper for scripts/setup.sh
+├── setup.ps1               # Root wrapper for scripts/setup.ps1
 ├── agents/skills/jira-management/   # Skill
 │   ├── SKILL.md
 │   └── references/
@@ -122,7 +136,8 @@ UPDATE_SNAPSHOTS=1 go test ./... -v                # Update golden files
 │       ├── jql-patterns.md
 │       └── workflows.md
 ├── scripts/
-│   ├── setup.sh            # Build + install
+│   ├── setup.sh            # macOS/Linux build + install
+│   ├── setup.ps1           # Windows build + install
 │   └── deinit.sh           # Uninstall
 ├── .spec/                  # Project specifications
 ├── .task-board/            # Task board (project management)
@@ -134,20 +149,25 @@ UPDATE_SNAPSHOTS=1 go test ./... -v                # Update golden files
 
 | Tool | Purpose | How to run |
 |------|---------|-----------|
-| `jira-mgmt` | CLI for Jira Cloud | `jira-mgmt --help` |
+| `jira-mgmt` | CLI for Jira Cloud and Server/DC | `jira-mgmt --help` |
 | `go test` | Run tests | `go test ./... -v` |
 | `task-board` | Project management board | `task-board summary` |
-| `scripts/setup.sh` | Build and install runtime artifacts | `./scripts/setup.sh` |
+| `setup.sh` / `setup.ps1` | Build and install runtime artifacts | `./setup.sh` / `.\setup.ps1` |
 | `scripts/deinit.sh` | Uninstall | `./scripts/deinit.sh [--purge]` |
 
 ## Config Location
 
-- **Config:** `~/.config/jira-mgmt/config.yaml` (global, per-user)
-- **Credentials:** OS keychain (macOS Keychain, Linux Secret Service)
+- **Config:** `os.UserConfigDir()/jira-mgmt/config.yaml`
+  - macOS: `~/Library/Application Support/jira-mgmt/config.yaml`
+  - Windows: `%AppData%\jira-mgmt\config.yaml`
+- **Credentials:** `auto | keychain | env_or_file`
+  - `auto` defaults to system keychain on macOS and Windows
+  - fallback file path: `os.UserConfigDir()/jira-mgmt/auth.json`
+- **Install state:** `os.UserConfigDir()/jira-mgmt/install.json`
 - **Binary:** `~/.local/bin/jira-mgmt` (standalone installed copy)
 - **Installed skill artifact:** `~/.agents/skills/jira-management` (degitized runtime copy)
 - **Skill entrypoints:** `~/.claude/skills/jira-management` + `~/.codex/skills/jira-management` (symlinks to the installed artifact)
 
 ## License
 
-MIT
+Apache 2.0
