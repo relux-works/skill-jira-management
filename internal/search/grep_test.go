@@ -170,6 +170,23 @@ func TestGrepComments(t *testing.T) {
 	}
 }
 
+func TestGrepComments_ServerPlainString(t *testing.T) {
+	comments := []jira.Comment{
+		{ID: "1003", BodyRaw: []byte(`"Server staging note"`)},
+	}
+
+	matches, err := GrepComments(comments, "PROJ-1", "staging", GrepOptions{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(matches) != 1 {
+		t.Fatalf("expected 1 match, got %d", len(matches))
+	}
+	if matches[0].Field != "comment/1003" {
+		t.Fatalf("field = %q, want comment/1003", matches[0].Field)
+	}
+}
+
 func TestPrintText(t *testing.T) {
 	matches := []Match{
 		{IssueKey: "A-1", Field: "summary", Line: 1, Content: "Fix auth"},

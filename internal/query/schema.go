@@ -29,6 +29,8 @@ var JiraAPIFieldMap = map[string]string{
 	"updated":     "updated",
 	"project":     "project",
 	"subtasks":    "subtasks",
+	"comments":    "",
+	"attachments": "attachment",
 }
 
 // APIFieldsFromSelector returns the Jira REST API field names for the fields
@@ -112,13 +114,47 @@ func NewSchema(client *jira.Client, defaultProject string, defaultBoard int) *ag
 		}
 		return subs
 	})
+	schema.Field("comments", func(i jira.Issue) any {
+		comments := make([]map[string]any, 0, len(i.Fields.Comments))
+		for _, comment := range i.Fields.Comments {
+			item := map[string]any{
+				"id":      comment.ID,
+				"body":    comment.BodyText(),
+				"created": comment.Created,
+				"updated": comment.Updated,
+			}
+			if comment.Author != nil {
+				item["author"] = comment.Author.DisplayName
+			}
+			comments = append(comments, item)
+		}
+		return comments
+	})
+	schema.Field("attachments", func(i jira.Issue) any {
+		attachments := make([]map[string]any, 0, len(i.Fields.Attachments))
+		for _, attachment := range i.Fields.Attachments {
+			item := map[string]any{
+				"id":       attachment.ID,
+				"filename": attachment.Filename,
+				"mimeType": attachment.MimeType,
+				"size":     attachment.Size,
+				"created":  attachment.Created,
+			}
+			if attachment.Author != nil {
+				item["author"] = attachment.Author.DisplayName
+			}
+			attachments = append(attachments, item)
+		}
+		return attachments
+	})
 
 	// --- Presets ---
 	schema.Preset("minimal", "key", "status")
 	schema.Preset("default", "key", "summary", "status", "assignee")
 	schema.Preset("overview", "key", "summary", "status", "assignee", "type", "priority", "parent")
 	schema.Preset("full", "key", "summary", "status", "assignee", "type", "priority", "parent",
-		"description", "labels", "reporter", "created", "updated", "project", "subtasks")
+		"description", "labels", "reporter", "created", "updated", "project", "subtasks",
+		"comments", "attachments")
 
 	// --- Default fields ---
 	schema.DefaultFields("default")
@@ -268,8 +304,25 @@ func opGet(client *jira.Client) agentquery.OperationHandler[jira.Issue] {
 			return nil, err
 		}
 
+		if selectorContains(ctx.Selector, "comments") {
+			comments, err := client.ListAllComments(issueKey)
+			if err != nil {
+				return nil, err
+			}
+			issue.Fields.Comments = comments
+		}
+
 		return ctx.Selector.Apply(*issue), nil
 	}
+}
+
+func selectorContains(sel *agentquery.FieldSelector[jira.Issue], field string) bool {
+	for _, selected := range sel.Fields() {
+		if selected == field {
+			return true
+		}
+	}
+	return false
 }
 
 // opList: list(project=X, type=epic, status=open) { fields }
@@ -493,4 +546,3 @@ func opSearch(client *jira.Client) agentquery.OperationHandler[jira.Issue] {
 		return results, nil
 	}
 }
-

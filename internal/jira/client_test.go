@@ -2,12 +2,86 @@ package jira
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 )
+
+func TestDownloadAttachment_VerifiesOwnershipAndBoundsResponse(t *testing.T) {
+	var srv *httptest.Server
+	srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/rest/api/2/issue/PROJ-1":
+			fmt.Fprintf(w, `{"id":"1","key":"PROJ-1","fields":{"attachment":[{"id":"20001","filename":"review.docx","size":7,"content":%q}]}}`, srv.URL+"/secure/attachment/20001/review.docx")
+		case "/secure/attachment/20001/review.docx":
+			if got := r.Header.Get("Authorization"); got != "Bearer test-token" {
+				t.Fatalf("Authorization = %q", got)
+			}
+			w.Write([]byte("payload"))
+		default:
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+	}))
+	defer srv.Close()
+
+	c := &Client{
+		baseURL:      srv.URL,
+		authHeader:   "Bearer test-token",
+		httpClient:   srv.Client(),
+		instanceType: InstanceServer,
+	}
+	data, attachment, err := c.DownloadAttachment("PROJ-1", "20001", 16)
+	if err != nil {
+		t.Fatalf("DownloadAttachment: %v", err)
+	}
+	if string(data) != "payload" || attachment.Filename != "review.docx" {
+		t.Fatalf("data=%q attachment=%#v", data, attachment)
+	}
+}
+
+func TestDownloadAttachment_RejectsCrossOriginURL(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`{"id":"1","key":"PROJ-1","fields":{"attachment":[{"id":"20001","filename":"review.docx","size":7,"content":"https://evil.example/review.docx"}]}}`))
+	}))
+	defer srv.Close()
+
+	c := &Client{
+		baseURL:      srv.URL,
+		authHeader:   "Bearer test-token",
+		httpClient:   srv.Client(),
+		instanceType: InstanceServer,
+	}
+	if _, _, err := c.DownloadAttachment("PROJ-1", "20001", 16); err == nil || !strings.Contains(err.Error(), "outside") {
+		t.Fatalf("expected cross-origin refusal, got %v", err)
+	}
+}
+
+func TestDownloadAttachment_RejectsOversizedBody(t *testing.T) {
+	var srv *httptest.Server
+	srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/rest/api/2/issue/PROJ-1":
+			fmt.Fprintf(w, `{"id":"1","key":"PROJ-1","fields":{"attachment":[{"id":"20001","filename":"review.docx","content":%q}]}}`, srv.URL+"/secure/attachment/20001/review.docx")
+		default:
+			w.Header().Set("Content-Length", "7")
+			w.Write([]byte("payload"))
+		}
+	}))
+	defer srv.Close()
+
+	c := &Client{
+		baseURL:      srv.URL,
+		authHeader:   "Bearer test-token",
+		httpClient:   srv.Client(),
+		instanceType: InstanceServer,
+	}
+	if _, _, err := c.DownloadAttachment("PROJ-1", "20001", 3); err == nil || !strings.Contains(err.Error(), "byte limit") {
+		t.Fatalf("expected byte-limit refusal, got %v", err)
+	}
+}
 
 // --- Story 1: HTTP Client & Auth ---
 
@@ -289,8 +363,8 @@ func TestCreateIssue(t *testing.T) {
 
 		w.WriteHeader(http.StatusCreated)
 		json.NewEncoder(w).Encode(CreateIssueResponse{
-			ID:  "10002",
-			Key: "PROJ-2",
+			ID:   "10002",
+			Key:  "PROJ-2",
 			Self: "https://test.atlassian.net/rest/api/3/issue/10002",
 		})
 	}))
@@ -299,11 +373,11 @@ func TestCreateIssue(t *testing.T) {
 	c := newTestClient(t, srv.URL)
 	resp, err := c.CreateIssue(&CreateIssueRequest{
 		Fields: CreateIssueFields{
-			Project:   ProjectRef{Key: "PROJ"},
-			IssueType: IssueTypeRef{Name: "Story"},
-			Summary:   "New story",
+			Project:     ProjectRef{Key: "PROJ"},
+			IssueType:   IssueTypeRef{Name: "Story"},
+			Summary:     "New story",
 			Description: NewADFText("Story description"),
-			Labels:    []string{"backend"},
+			Labels:      []string{"backend"},
 		},
 	})
 	if err != nil {
@@ -1025,6 +1099,69 @@ func TestListComments(t *testing.T) {
 	}
 	if resp.Total != 2 {
 		t.Errorf("total = %d, want 2", resp.Total)
+	}
+}
+
+func TestListComments_ServerPlainStringBody(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/rest/api/2/issue/PROJ-1/comment" {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"startAt":0,"maxResults":50,"total":1,"comments":[{"id":"1","body":"Server comment","created":"2026-08-26T10:00:00.000+0300"}]}`))
+	}))
+	defer srv.Close()
+
+	c := &Client{
+		baseURL:      srv.URL,
+		authHeader:   "Bearer test-token",
+		httpClient:   srv.Client(),
+		instanceType: InstanceServer,
+	}
+
+	resp, err := c.ListComments("PROJ-1", 0, 50)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got := resp.Comments[0].BodyText(); got != "Server comment" {
+		t.Fatalf("BodyText() = %q, want %q", got, "Server comment")
+	}
+}
+
+func TestListComments_CloudADFBody(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"startAt":0,"maxResults":50,"total":1,"comments":[{"id":"1","body":{"type":"doc","version":1,"content":[{"type":"paragraph","content":[{"type":"text","text":"Cloud comment"}]}]}}]}`))
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv.URL)
+	resp, err := c.ListComments("PROJ-1", 0, 50)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got := resp.Comments[0].BodyText(); got != "Cloud comment\n" {
+		t.Fatalf("BodyText() = %q, want %q", got, "Cloud comment\\n")
+	}
+}
+
+func TestGetIssue_Attachments(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"id":"1","key":"PROJ-1","fields":{"attachment":[{"id":"20001","filename":"review.docx","mimeType":"application/vnd.openxmlformats-officedocument.wordprocessingml.document","size":18432,"content":"https://jira.example/secure/attachment/20001/review.docx"}]}}`))
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv.URL)
+	issue, err := c.GetIssue("PROJ-1", []string{"attachment"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(issue.Fields.Attachments) != 1 {
+		t.Fatalf("attachments = %d, want 1", len(issue.Fields.Attachments))
+	}
+	if got := issue.Fields.Attachments[0].Filename; got != "review.docx" {
+		t.Fatalf("filename = %q, want review.docx", got)
 	}
 }
 

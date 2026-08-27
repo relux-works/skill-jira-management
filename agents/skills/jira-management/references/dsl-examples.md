@@ -71,8 +71,22 @@ jira-mgmt q 'get(PROJ-123){full}'
   "subtasks": [
     {"key": "PROJ-130", "summary": "Google OAuth2 setup", "status": "Done"},
     {"key": "PROJ-131", "summary": "GitHub OAuth2 setup", "status": "In Progress"}
+  ],
+  "comments": [
+    {"id": "10001", "author": "Bob Smith", "body": "Please clarify the clock source.", "created": "2026-02-11T15:00:00.000+0000"}
+  ],
+  "attachments": [
+    {"id": "20001", "filename": "review.docx", "mimeType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "size": 18432}
   ]
 }
+```
+
+`comments` normalizes Jira Cloud ADF and Jira Server/DC plain-string bodies. `attachments` exposes metadata only and never returns authenticated content URLs.
+
+For a narrow read without the rest of `full`:
+
+```bash
+jira-mgmt q 'get(PROJ-123){comments attachments}'
 ```
 
 **Subtasks field:** Only present in `full` preset. Shows key, summary, status for each subtask. Useful for tracking progress of parent stories/tasks.

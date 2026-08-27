@@ -80,8 +80,8 @@ type ADFMark struct {
 
 // User represents a Jira user.
 type User struct {
-	AccountID   string `json:"accountId,omitempty"`
-	DisplayName string `json:"displayName,omitempty"`
+	AccountID    string `json:"accountId,omitempty"`
+	DisplayName  string `json:"displayName,omitempty"`
 	EmailAddress string `json:"emailAddress,omitempty"`
 	Active       bool   `json:"active,omitempty"`
 }
@@ -98,23 +98,38 @@ type Issue struct {
 
 // IssueFields represents the standard fields of a Jira issue.
 type IssueFields struct {
-	Summary     string    `json:"summary,omitempty"`
-	Description *ADFDoc   `json:"-"` // custom unmarshal: ADF (Cloud v3) or string (Server v2)
+	Summary        string          `json:"summary,omitempty"`
+	Description    *ADFDoc         `json:"-"`                     // custom unmarshal: ADF (Cloud v3) or string (Server v2)
 	DescriptionRaw json.RawMessage `json:"description,omitempty"` // raw for flexible deserialization
-	IssueType   IssueType `json:"issuetype,omitempty"`
-	Project     Project   `json:"project,omitempty"`
-	Status      *Status   `json:"status,omitempty"`
-	Priority    *Priority `json:"priority,omitempty"`
-	Assignee    *User     `json:"assignee,omitempty"`
-	Reporter    *User     `json:"reporter,omitempty"`
-	Labels      []string  `json:"labels,omitempty"`
-	Parent      *Issue    `json:"parent,omitempty"`
-	Subtasks    []Issue   `json:"subtasks,omitempty"`
-	Created     string    `json:"created,omitempty"`
-	Updated     string    `json:"updated,omitempty"`
+	IssueType      IssueType       `json:"issuetype,omitempty"`
+	Project        Project         `json:"project,omitempty"`
+	Status         *Status         `json:"status,omitempty"`
+	Priority       *Priority       `json:"priority,omitempty"`
+	Assignee       *User           `json:"assignee,omitempty"`
+	Reporter       *User           `json:"reporter,omitempty"`
+	Labels         []string        `json:"labels,omitempty"`
+	Parent         *Issue          `json:"parent,omitempty"`
+	Subtasks       []Issue         `json:"subtasks,omitempty"`
+	Created        string          `json:"created,omitempty"`
+	Updated        string          `json:"updated,omitempty"`
+	Attachments    []Attachment    `json:"attachment,omitempty"`
+	Comments       []Comment       `json:"-"` // loaded explicitly for targeted issue reads
 
 	// Custom fields are stored here for flexible access.
 	CustomFields map[string]json.RawMessage `json:"-"`
+}
+
+// Attachment is the safe metadata Jira exposes for an issue attachment.
+// Content is retained internally for authenticated downloads but is not
+// projected by the agent-facing query layer.
+type Attachment struct {
+	ID       string `json:"id,omitempty"`
+	Filename string `json:"filename,omitempty"`
+	Author   *User  `json:"author,omitempty"`
+	Created  string `json:"created,omitempty"`
+	Size     int64  `json:"size,omitempty"`
+	MimeType string `json:"mimeType,omitempty"`
+	Content  string `json:"content,omitempty"`
 }
 
 // DescriptionText returns the description as plain text.
@@ -188,7 +203,7 @@ type CreateIssueRequest struct {
 
 // CreateIssueFields holds the fields for issue creation.
 type CreateIssueFields struct {
-	Project     ProjectRef `json:"project"`
+	Project     ProjectRef   `json:"project"`
 	IssueType   IssueTypeRef `json:"issuetype"`
 	Summary     string       `json:"summary"`
 	Description *ADFDoc      `json:"description,omitempty"`
@@ -320,12 +335,12 @@ type TransitionsResponse struct {
 
 // TransitionField describes an issue field exposed on a workflow transition screen.
 type TransitionField struct {
-	Required      bool                  `json:"required,omitempty"`
+	Required      bool                   `json:"required,omitempty"`
 	Schema        *TransitionFieldSchema `json:"schema,omitempty"`
-	Name          string                `json:"name,omitempty"`
-	FieldID       string                `json:"fieldId,omitempty"`
-	Operations    []string              `json:"operations,omitempty"`
-	AllowedValues []TransitionOption    `json:"allowedValues,omitempty"`
+	Name          string                 `json:"name,omitempty"`
+	FieldID       string                 `json:"fieldId,omitempty"`
+	Operations    []string               `json:"operations,omitempty"`
+	AllowedValues []TransitionOption     `json:"allowedValues,omitempty"`
 }
 
 // TransitionFieldSchema describes a transition field schema.
@@ -346,8 +361,8 @@ type TransitionOption struct {
 
 // DoTransitionRequest is the request body for executing a transition.
 type DoTransitionRequest struct {
-	Transition TransitionRef              `json:"transition"`
-	Fields     map[string]interface{}     `json:"fields,omitempty"`
+	Transition TransitionRef          `json:"transition"`
+	Fields     map[string]interface{} `json:"fields,omitempty"`
 }
 
 // TransitionRef identifies a transition by ID.
@@ -397,12 +412,37 @@ type SearchResponse struct {
 
 // Comment represents a Jira issue comment.
 type Comment struct {
-	ID      string  `json:"id,omitempty"`
-	Self    string  `json:"self,omitempty"`
-	Author  *User   `json:"author,omitempty"`
-	Body    *ADFDoc `json:"body,omitempty"`
-	Created string  `json:"created,omitempty"`
-	Updated string  `json:"updated,omitempty"`
+	ID      string          `json:"id,omitempty"`
+	Self    string          `json:"self,omitempty"`
+	Author  *User           `json:"author,omitempty"`
+	Body    *ADFDoc         `json:"-"`
+	BodyRaw json.RawMessage `json:"body,omitempty"`
+	Created string          `json:"created,omitempty"`
+	Updated string          `json:"updated,omitempty"`
+}
+
+// BodyText returns a comment body as plain text for both Jira Cloud ADF and
+// Jira Server/Data Center string responses.
+func (c *Comment) BodyText() string {
+	if c.Body != nil && c.BodyRaw == nil {
+		return extractADFText(c.Body)
+	}
+	if c.BodyRaw == nil {
+		return ""
+	}
+
+	var text string
+	if err := json.Unmarshal(c.BodyRaw, &text); err == nil {
+		return text
+	}
+
+	var doc ADFDoc
+	if err := json.Unmarshal(c.BodyRaw, &doc); err == nil {
+		c.Body = &doc
+		return extractADFText(&doc)
+	}
+
+	return string(c.BodyRaw)
 }
 
 // CommentsResponse is the paginated response for issue comments.
