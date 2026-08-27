@@ -287,6 +287,21 @@ jira-mgmt grep -C 2 "performance"
 
 ---
 
+## Attachment Commands
+
+### jira-mgmt attachment fetch
+
+Download one attachment after verifying that it belongs to the named issue:
+
+```bash
+jira-mgmt attachment fetch PROJ-123 20001 --out .temp/PROJ-123/review.docx
+```
+
+The output must not already exist. `--max-bytes` defaults to 32 MiB and is
+capped at 100 MiB. The client refuses cross-origin content URLs and redirects.
+
+---
+
 ## Create Commands
 
 ### jira-mgmt create

@@ -103,6 +103,12 @@ jira-mgmt config set locale en
 # Single issue
 jira-mgmt q 'get(PROJ-123)'
 
+# Targeted comments and attachment metadata
+jira-mgmt q 'get(PROJ-123){comments attachments}'
+
+# Bounded authenticated attachment download
+jira-mgmt attachment fetch PROJ-123 20001 --out .temp/PROJ-123/review.docx
+
 # List current sprint
 jira-mgmt q 'list(sprint=current){default}'
 

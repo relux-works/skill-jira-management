@@ -70,17 +70,11 @@ Examples:
 
 		// Search comments
 		if grepScope == "comments" || grepScope == "all" || grepScope == "" {
-			for _, issue := range issues {
-				comments, err := client.ListAllComments(issue.Key)
-				if err != nil {
-					continue
-				}
-				matches, err := search.GrepComments(comments, issue.Key, pattern, opts)
-				if err != nil {
-					continue
-				}
-				allMatches = append(allMatches, matches...)
+			matches, err := grepIssueComments(client, issues, pattern, opts)
+			if err != nil {
+				return err
 			}
+			allMatches = append(allMatches, matches...)
 		}
 
 		out := cmd.OutOrStdout()
@@ -97,6 +91,41 @@ Examples:
 
 		return nil
 	},
+}
+
+func grepIssueComments(client *jira.Client, issues []jira.Issue, pattern string, opts search.GrepOptions) ([]search.Match, error) {
+	var allMatches []search.Match
+	var firstFetchErr error
+	var firstFetchIssue string
+	failures := 0
+
+	for _, issue := range issues {
+		comments, err := client.ListAllComments(issue.Key)
+		if err != nil {
+			failures++
+			if firstFetchErr == nil {
+				firstFetchErr = err
+				firstFetchIssue = issue.Key
+			}
+			continue
+		}
+		matches, err := search.GrepComments(comments, issue.Key, pattern, opts)
+		if err != nil {
+			return nil, err
+		}
+		allMatches = append(allMatches, matches...)
+	}
+
+	if failures > 0 {
+		return nil, fmt.Errorf(
+			"fetching comments failed for %d of %d issues; first failure for %s: %w",
+			failures,
+			len(issues),
+			firstFetchIssue,
+			firstFetchErr,
+		)
+	}
+	return allMatches, nil
 }
 
 func init() {

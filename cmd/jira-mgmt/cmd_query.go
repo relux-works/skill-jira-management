@@ -21,7 +21,7 @@ func buildQueryCommand() *cobra.Command {
 		Long: `Execute one or more DSL queries against Jira Cloud.
 
 Operations:
-  get(ISSUE-KEY) { fields }             — single issue lookup
+  get(ISSUE-KEY) { fields }             — single issue lookup; full includes comments and attachments
   list(project=X, type=epic) { fields } — filtered listing
   count(project=X, status=done)         — count matching issues
   summary()                             — project/board overview

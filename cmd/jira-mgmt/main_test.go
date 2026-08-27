@@ -2,9 +2,62 @@ package main
 
 import (
 	"bytes"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/relux-works/skill-jira-management/internal/jira"
+	"github.com/relux-works/skill-jira-management/internal/search"
 )
+
+func TestWritePrivateFile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "nested", "attachment.bin")
+	if err := writePrivateFile(path, []byte("payload")); err != nil {
+		t.Fatalf("writePrivateFile: %v", err)
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatalf("stat: %v", err)
+	}
+	if info.Mode().Perm() != 0o600 {
+		t.Fatalf("mode = %o, want 600", info.Mode().Perm())
+	}
+	if err := writePrivateFile(path, []byte("replacement")); err == nil {
+		t.Fatal("expected existing-output refusal")
+	}
+}
+
+func TestGrepIssueCommentsReportsFetchFailures(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "comment endpoint unavailable", http.StatusServiceUnavailable)
+	}))
+	defer srv.Close()
+
+	client, err := jira.NewClient(jira.Config{
+		BaseURL:      srv.URL,
+		Token:        "test-token",
+		AuthType:     jira.AuthBearer,
+		InstanceType: jira.InstanceServer,
+	})
+	if err != nil {
+		t.Fatalf("NewClient: %v", err)
+	}
+	client.SetHTTPClient(srv.Client())
+
+	issues := []jira.Issue{{Key: "PROJ-1"}, {Key: "PROJ-2"}}
+	_, err = grepIssueComments(client, issues, ".", search.GrepOptions{Scope: "comments"})
+	if err == nil {
+		t.Fatal("expected comment fetch failure")
+	}
+	want := fmt.Sprintf("fetching comments failed for %d of %d issues", len(issues), len(issues))
+	if !strings.Contains(err.Error(), want) || !strings.Contains(err.Error(), "PROJ-1") {
+		t.Fatalf("error = %q, want count and first issue", err)
+	}
+}
 
 func executeCommand(args ...string) (string, error) {
 	buf := new(bytes.Buffer)
