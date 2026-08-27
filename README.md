@@ -68,13 +68,14 @@ jira-mgmt config show                  # Show current config
 
 ```bash
 jira-mgmt q 'get(PROJ-123) { default }'                           # Single issue
+jira-mgmt q 'get(PROJ-123) { comments attachments }'              # Targeted discussion and files
 jira-mgmt q 'list(project=PROJ, type=epic) { overview }'          # List epics
 jira-mgmt q 'summary()'                                            # Project overview
 jira-mgmt q 'search(jql="assignee=currentUser()") { minimal }'    # JQL search
 jira-mgmt q 'get(A-1) { status }; get(A-2) { status }'            # Batch queries
 ```
 
-Field presets: `minimal` (key, status), `default` (+summary, assignee), `overview` (+type, priority, parent), `full` (all fields).
+Field presets: `minimal` (key, status), `default` (+summary, assignee), `overview` (+type, priority, parent), `full` (all fields, including comments and attachment metadata for a targeted issue read).
 
 ### Grep (text search)
 
@@ -83,6 +84,17 @@ jira-mgmt grep "pattern"                    # Search all
 jira-mgmt grep "bug" --scope issues -i      # Search issues, case-insensitive
 jira-mgmt grep "deploy" --scope comments    # Search comments
 ```
+
+### Attachments
+
+```bash
+jira-mgmt q 'get(PROJ-123){attachments}'
+jira-mgmt attachment fetch PROJ-123 20001 --out .temp/PROJ-123/review.docx
+```
+
+Attachment fetch first verifies that the attachment belongs to the named issue,
+requires a same-origin Jira content URL, refuses redirects, caps the response,
+and writes a new mode-`0600` file atomically.
 
 ### Write Operations
 

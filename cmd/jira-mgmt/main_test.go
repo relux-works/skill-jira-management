@@ -2,9 +2,28 @@ package main
 
 import (
 	"bytes"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
+
+func TestWritePrivateFile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "nested", "attachment.bin")
+	if err := writePrivateFile(path, []byte("payload")); err != nil {
+		t.Fatalf("writePrivateFile: %v", err)
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatalf("stat: %v", err)
+	}
+	if info.Mode().Perm() != 0o600 {
+		t.Fatalf("mode = %o, want 600", info.Mode().Perm())
+	}
+	if err := writePrivateFile(path, []byte("replacement")); err == nil {
+		t.Fatal("expected existing-output refusal")
+	}
+}
 
 func executeCommand(args ...string) (string, error) {
 	buf := new(bytes.Buffer)

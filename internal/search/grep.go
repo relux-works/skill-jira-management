@@ -15,9 +15,9 @@ import (
 // Match represents a single grep hit within an issue.
 type Match struct {
 	IssueKey string `json:"issue_key"`
-	Field    string `json:"field"`    // which field matched (summary, description, comment, etc.)
-	Content  string `json:"content"`  // the matched text
-	Line     int    `json:"line"`     // line number within the field (1-indexed)
+	Field    string `json:"field"`   // which field matched (summary, description, comment, etc.)
+	Content  string `json:"content"` // the matched text
+	Line     int    `json:"line"`    // line number within the field (1-indexed)
 }
 
 // GrepOptions controls grep behavior.
@@ -109,10 +109,10 @@ func GrepComments(comments []jira.Comment, issueKey, pattern string, opts GrepOp
 	var results []Match
 
 	for _, comment := range comments {
-		if comment.Body == nil {
+		text := comment.BodyText()
+		if text == "" {
 			continue
 		}
-		text := extractADFText(comment.Body)
 		lines := strings.Split(text, "\n")
 		for lineNum, line := range lines {
 			if re.MatchString(line) {
