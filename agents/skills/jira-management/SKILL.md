@@ -121,6 +121,9 @@ jira-mgmt q 'search(jql="assignee=currentUser() AND statusCategory!=Done"){defau
 # Create issue
 jira-mgmt create --type story --summary "Login UI" --project PROJ
 
+# Assign
+jira-mgmt assign PROJ-123 --to me
+
 # Transition
 jira-mgmt transition PROJ-123 --to "In Progress"
 
@@ -177,7 +180,10 @@ jira-mgmt dod PROJ-123 --set "Tests pass\nCode reviewed"
 
 ### Update
 - `jira-mgmt update ISSUE-KEY --summary "..." --description "..."` — update issue fields
+- `jira-mgmt assign ISSUE-KEY [ISSUE-KEY...] --to me|username|email` — set the assignee; `--clear` unassigns
 - `jira-mgmt transition ISSUE-KEY --to "Status Name"` — move to status
+  - `--list-fields` prints the transition's screen fields, marking the required ones and listing allowed values
+  - `--field "Name=Value"` (repeatable) fills a screen field; accepts the display name or the field id
 - `jira-mgmt cancel ISSUE-KEY --reason "..."` — cancel an issue with workflow-aware required fields
 - `jira-mgmt comment ISSUE-KEY --body "text"` — add comment
 - `jira-mgmt dod ISSUE-KEY --set "criteria"` — set Definition of Done
@@ -211,6 +217,14 @@ jira-mgmt grep -i "performance"
 **User:** "Move PROJ-123 to done"
 ```bash
 jira-mgmt transition PROJ-123 --to "Done"
+```
+
+**User:** "Assign these to me and put them in progress"
+```bash
+jira-mgmt assign PROJ-123 PROJ-124 --to me
+# A workflow may require screen fields; ask what it wants before guessing:
+jira-mgmt transition PROJ-123 --to "In Progress" --list-fields
+jira-mgmt transition PROJ-123 --to "In Progress" --field "Вид деятельности=Разработка"
 ```
 
 **User:** "Cancel PROJ-123 because work with the vendor stopped"
@@ -271,6 +285,16 @@ The CLI auto-detects instance type and adapts. Key differences to be aware of:
 | Descriptions/comments | ADF (Atlassian Document Format) | ADF (Jira 8.x+) or wiki markup |
 | Project listing | Paginated `/project/search` | `/project` returns full array |
 | Status names | English by default | May be localized (e.g. Russian) |
+| Assignee addressing | `accountId` | `name` (username) |
+
+**Assignee addressing does not overlap.** Cloud rejects `name` and Server/DC
+rejects `accountId`, so `assign` resolves the user and picks the field from the
+detected instance type. A `--to` query that matches several users is refused
+rather than guessed.
+
+**Required transition fields.** A workflow screen can demand fields the issue
+does not carry; Jira then refuses the transition and names an internal field id.
+`--list-fields` shows what the transition wants, `--field` supplies it.
 
 **Status names on Server/DC** may be in the instance's language. Use exact names as returned by Jira:
 ```bash

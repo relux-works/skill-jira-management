@@ -79,8 +79,14 @@ type ADFMark struct {
 // --- User ---
 
 // User represents a Jira user.
+//
+// Cloud addresses a user by AccountID, Server/DC by Name; the two are not
+// interchangeable and each instance rejects the other's field, so both are
+// carried here and the caller picks by instance type.
 type User struct {
 	AccountID    string `json:"accountId,omitempty"`
+	Name         string `json:"name,omitempty"`
+	Key          string `json:"key,omitempty"`
 	DisplayName  string `json:"displayName,omitempty"`
 	EmailAddress string `json:"emailAddress,omitempty"`
 	Active       bool   `json:"active,omitempty"`

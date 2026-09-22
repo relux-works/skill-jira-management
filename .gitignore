@@ -16,3 +16,6 @@ CLAUDE.md
 # Binaries
 /jira-mgmt
 /cmd/jira-mgmt/jira-mgmt
+
+# Agent artifacts (composed entrypoint, not product)
+AGENTS.md
