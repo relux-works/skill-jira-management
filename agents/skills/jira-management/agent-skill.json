@@ -1,0 +1,10 @@
+{
+  "schema_version": 3,
+  "capabilities": {
+    "network": [
+      "id.atlassian.com",
+      "developer.atlassian.com",
+      "support.atlassian.com"
+    ]
+  }
+}

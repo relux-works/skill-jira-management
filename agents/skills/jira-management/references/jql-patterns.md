@@ -1095,7 +1095,7 @@ curl -X POST \
   -H "Authorization: Basic $(echo -n 'email:token' | base64)" \
   -H "Content-Type: application/json" \
   -d '{"jql": "project = ACME", "maxResults": 1}' \
-  https://your-domain.atlassian.net/rest/api/3/search
+  https://jira-cloud.example/rest/api/3/search
 ```
 
 ### 3. Validation Tools

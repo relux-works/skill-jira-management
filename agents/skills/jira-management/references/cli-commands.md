@@ -13,15 +13,15 @@ Authentication setup. Supports both interactive and non-interactive (agent-frien
 **Non-interactive (recommended for agents):**
 ```bash
 # Cloud (Basic auth — email + API token)
-jira-mgmt auth --instance https://mycompany.atlassian.net --email user@company.com --token API_TOKEN
+jira-mgmt auth --instance https://jira-cloud.example --email user@company.example --token API_TOKEN
 
 # Server/DC (Bearer auth — Personal Access Token, no email)
-jira-mgmt auth --instance https://jira.company.com --token PAT_TOKEN
+jira-mgmt auth --instance https://jira-server.example --token PAT_TOKEN
 ```
 
 Equivalent explicit command:
 ```bash
-jira-mgmt auth set-access --instance https://mycompany.atlassian.net --email user@company.com --token API_TOKEN
+jira-mgmt auth set-access --instance https://jira-cloud.example --email user@company.example --token API_TOKEN
 ```
 
 **Interactive (prompts for input):**
@@ -82,7 +82,7 @@ Remove stored credentials for the selected instance.
 
 ```bash
 jira-mgmt auth clean
-jira-mgmt auth clean --instance https://jira.company.com
+jira-mgmt auth clean --instance https://jira-server.example
 ```
 
 ### jira-mgmt auth config-path
@@ -144,7 +144,7 @@ jira-mgmt config show
 ```
 Jira Configuration
 ------------------
-Instance: https://acme.atlassian.net
+Instance: https://jira-cloud.example
 Email: user@example.com
 Project: ACME
 Board: 456

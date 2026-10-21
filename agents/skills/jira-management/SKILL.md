@@ -69,12 +69,12 @@ triggers:
 
 **Cloud (email + API token → Basic auth):**
 ```bash
-jira-mgmt auth set-access --instance https://mycompany.atlassian.net --email user@company.com --token API_TOKEN
+jira-mgmt auth set-access --instance https://jira-cloud.example --email user@company.example --token API_TOKEN
 ```
 
 **Server/DC (Personal Access Token → Bearer auth):**
 ```bash
-jira-mgmt auth set-access --instance https://jira.company.com --token PAT_TOKEN
+jira-mgmt auth set-access --instance https://jira-server.example --token PAT_TOKEN
 ```
 
 Auth type is auto-determined: email provided → Basic (Cloud), no email → Bearer (Server/DC PAT).
