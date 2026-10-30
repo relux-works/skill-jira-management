@@ -104,6 +104,10 @@ limit is 25 MiB (26214400 bytes); `--max-bytes N` sets a positive byte limit.
 `--name NAME` overrides the local basename and must contain no path separator.
 JSON output contains `issue`, `id`, `filename` and `size`; `--format text`
 prints one line. Upload requests are not automatically retried.
+For upload, discovery, issue reads and POST responses each have a 1 MiB response
+limit, including error bodies, and redirects are refused throughout the operation.
+On macOS and Linux, opening the source also refuses a symlink or special file
+substituted after validation without waiting for a FIFO writer.
 
 ### Write Operations
 

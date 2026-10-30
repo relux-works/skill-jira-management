@@ -30,7 +30,7 @@ var attachmentUploadCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		client, err := buildJiraClientFromConfig()
+		client, err := buildJiraUploadClientFromConfig()
 		if err != nil {
 			return err
 		}

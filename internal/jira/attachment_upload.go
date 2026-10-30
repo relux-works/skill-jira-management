@@ -17,6 +17,8 @@ import (
 )
 
 const DefaultAttachmentUploadBytes int64 = 25 << 20
+
+// maxAttachmentResponseBytes caps every response body in an upload, including discovery and issue reads.
 const maxAttachmentResponseBytes int64 = 1 << 20
 
 var uploadIssueKey = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_]*-[0-9]+$`)
@@ -27,6 +29,25 @@ type AttachmentUpload struct {
 	issueKey string
 	filename string
 	data     []byte
+}
+
+type attachmentResponsePolicyError struct {
+	message string
+}
+
+func (e *attachmentResponsePolicyError) Error() string {
+	return e.message
+}
+
+// ForAttachmentUpload copies the client and installs the upload policy before discovery or issue reads.
+// Authentication, transport (including TLS), timeout and API version are retained; the original is untouched.
+func (c *Client) ForAttachmentUpload() *Client {
+	scoped := *c
+	httpClient := *c.httpClient
+	httpClient.CheckRedirect = func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse }
+	scoped.httpClient = &httpClient
+	scoped.attachmentUpload = true
+	return &scoped
 }
 
 // PrepareAttachmentUpload validates all local inputs and reads at most maxBytes of a regular file.
@@ -60,15 +81,11 @@ func PrepareAttachmentUpload(issueKey, path, name string, maxBytes int64) (*Atta
 	if info.Size() > maxBytes {
 		return nil, fmt.Errorf("jira: attachment exceeds the configured byte limit")
 	}
-	file, err := os.Open(path)
+	file, err := openAttachmentFile(path, info)
 	if err != nil {
 		return nil, fmt.Errorf("jira: cannot read attachment file")
 	}
 	defer file.Close()
-	opened, err := file.Stat()
-	if err != nil || !opened.Mode().IsRegular() || !os.SameFile(info, opened) {
-		return nil, fmt.Errorf("jira: attachment file changed during validation")
-	}
 	data, err := io.ReadAll(io.LimitReader(file, maxBytes))
 	if err != nil {
 		return nil, fmt.Errorf("jira: cannot read attachment file")
@@ -102,6 +119,7 @@ func validAttachmentName(name string) bool {
 // UploadAttachment verifies the issue with the normal read before one multipart POST.
 // The POST is never retried: a lost response does not prove that Jira failed to create the attachment.
 func (c *Client) UploadAttachment(upload *AttachmentUpload) (*Attachment, error) {
+	c = c.ForAttachmentUpload()
 	if upload == nil || !uploadIssueKey.MatchString(upload.issueKey) || !validAttachmentName(upload.filename) || len(upload.data) == 0 {
 		return nil, fmt.Errorf("jira: a prepared attachment upload is required")
 	}
@@ -134,9 +152,7 @@ func (c *Client) UploadAttachment(upload *AttachmentUpload) (*Attachment, error)
 	req.Header.Set("Content-Type", writer.FormDataContentType())
 	req.Header.Set("X-Atlassian-Token", "no-check")
 
-	httpClient := *c.httpClient
-	httpClient.CheckRedirect = func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse }
-	resp, err := httpClient.Do(req)
+	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		// Transport errors can contain URLs or reflected headers; do not expose them.
 		return nil, fmt.Errorf("jira: attachment upload request failed (check network and TLS configuration)")

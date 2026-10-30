@@ -26,6 +26,14 @@ var getCredentialResolver = func() *config.Resolver {
 
 // buildJiraClientFromConfig creates a Jira client from stored config and credentials.
 func buildJiraClientFromConfig() (*jira.Client, error) {
+	return buildJiraClientWithUploadPolicy(false)
+}
+
+func buildJiraUploadClientFromConfig() (*jira.Client, error) {
+	return buildJiraClientWithUploadPolicy(true)
+}
+
+func buildJiraClientWithUploadPolicy(upload bool) (*jira.Client, error) {
 	cfgMgr, err := newConfigManager()
 	if err != nil {
 		return nil, fmt.Errorf("config manager: %w", err)
@@ -58,10 +66,15 @@ func buildJiraClientFromConfig() (*jira.Client, error) {
 	if err != nil {
 		return nil, err
 	}
+	if upload {
+		client = client.ForAttachmentUpload()
+	}
 
 	if cfg.InstanceType == "" {
 		if instanceType, err := client.DetectInstanceType(); err == nil {
 			_ = cfgMgr.SetInstanceType(string(instanceType))
+		} else if upload {
+			return nil, fmt.Errorf("jira: attachment discovery failed: %w", err)
 		}
 	}
 	if cfg.AuthType == "" && resolved.ResolvedFrom != "env" {

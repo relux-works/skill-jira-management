@@ -24,10 +24,11 @@ const (
 
 // Client is the Jira REST API client (supports Cloud and Server/DC).
 type Client struct {
-	baseURL      string
-	authHeader   string
-	httpClient   *http.Client
-	instanceType InstanceType
+	baseURL          string
+	authHeader       string
+	httpClient       *http.Client
+	instanceType     InstanceType
+	attachmentUpload bool // operation-local response policy; ordinary clients retain their behavior
 }
 
 // NewClient creates a new Jira API client (supports Cloud and Server/DC).
@@ -90,6 +91,10 @@ func (c *Client) DetectInstanceType() (InstanceType, error) {
 	// Try /rest/api/2/serverInfo — Server/DC returns deployment info, Cloud also supports it
 	data, err := c.Get("/rest/api/2/serverInfo", nil)
 	if err != nil {
+		var policyErr *attachmentResponsePolicyError
+		if errors.As(err, &policyErr) {
+			return "", err
+		}
 		// If serverInfo fails, assume Cloud
 		c.instanceType = InstanceCloud
 		return InstanceCloud, nil
@@ -166,8 +171,19 @@ func (c *Client) request(method, path string, query url.Values, body interface{}
 			return nil, lastErr
 		}
 
-		respBody, err := io.ReadAll(resp.Body)
+		if c.attachmentUpload && resp.StatusCode >= 300 && resp.StatusCode < 400 {
+			resp.Body.Close()
+			return nil, &attachmentResponsePolicyError{fmt.Sprintf("jira: attachment operation refuses redirects (HTTP %d)", resp.StatusCode)}
+		}
+		var responseReader io.Reader = resp.Body
+		if c.attachmentUpload {
+			responseReader = io.LimitReader(resp.Body, maxAttachmentResponseBytes+1)
+		}
+		respBody, err := io.ReadAll(responseReader)
 		resp.Body.Close()
+		if c.attachmentUpload && int64(len(respBody)) > maxAttachmentResponseBytes {
+			return nil, &attachmentResponsePolicyError{fmt.Sprintf("jira: attachment response exceeds byte limit (HTTP %d)", resp.StatusCode)}
+		}
 		if err != nil {
 			return nil, fmt.Errorf("jira: failed to read response body: %w", err)
 		}

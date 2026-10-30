@@ -317,6 +317,8 @@ The file must be readable, non-empty and regular; symlinks are refused.
 A 404 issue read prevents the upload. The multipart POST uses the configured
 Cloud or Server/DC API version, authentication and TLS settings, including
 `--insecure`. It is not automatically retried.
+Discovery, issue reads and upload responses, including error bodies, are capped
+at 1 MiB each. Redirects are refused from the first request of this operation.
 The default JSON output contains `issue`, `id`, `filename` and `size`;
 `--format text` prints one line.
 
