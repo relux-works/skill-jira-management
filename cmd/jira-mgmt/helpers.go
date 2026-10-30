@@ -8,6 +8,9 @@ import (
 	"github.com/zalando/go-keyring"
 )
 
+// newConfigManager lets command tests use isolated configuration files.
+var newConfigManager = config.NewConfigManager
+
 // getCredentialResolver returns the platform-aware credential resolver.
 // Tests can override it.
 var getCredentialResolver = func() *config.Resolver {
@@ -23,7 +26,7 @@ var getCredentialResolver = func() *config.Resolver {
 
 // buildJiraClientFromConfig creates a Jira client from stored config and credentials.
 func buildJiraClientFromConfig() (*jira.Client, error) {
-	cfgMgr, err := config.NewConfigManager()
+	cfgMgr, err := newConfigManager()
 	if err != nil {
 		return nil, fmt.Errorf("config manager: %w", err)
 	}

@@ -84,7 +84,7 @@ func shouldSkipAuthCheck(cmd *cobra.Command) bool {
 
 // loadConfigDefaults fills global flags from config when not set explicitly via CLI.
 func loadConfigDefaults(cmd *cobra.Command) {
-	mgr, err := config.NewConfigManager()
+	mgr, err := newConfigManager()
 	if err != nil {
 		return
 	}
@@ -104,7 +104,7 @@ func loadConfigDefaults(cmd *cobra.Command) {
 
 // checkFirstRun verifies that authentication is configured.
 func checkFirstRun() error {
-	cfgMgr, err := config.NewConfigManager()
+	cfgMgr, err := newConfigManager()
 	if err != nil {
 		return nil
 	}

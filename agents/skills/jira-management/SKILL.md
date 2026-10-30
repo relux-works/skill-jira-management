@@ -109,6 +109,9 @@ jira-mgmt q 'get(PROJ-123){comments attachments}'
 # Bounded authenticated attachment download
 jira-mgmt attachment fetch PROJ-123 20001 --out .temp/PROJ-123/review.docx
 
+# Upload a non-empty regular file (25 MiB default cap; verifies the issue first)
+jira-mgmt attachment upload PROJ-123 ./review.docx --name review.docx
+
 # List current sprint
 jira-mgmt q 'list(sprint=current){default}'
 
@@ -172,6 +175,15 @@ jira-mgmt dod PROJ-123 --set "Tests pass\nCode reviewed"
 ### Search
 - `jira-mgmt grep <pattern>` — search issues/comments
   - Flags: `--scope issues|comments|all`, `-i`, `-C <num>`
+
+### Attachments
+- `jira-mgmt attachment fetch PROJ-123 20001 --out ./review.docx` — download an issue attachment
+- `jira-mgmt attachment upload PROJ-123 ./review.docx [--name NAME] [--max-bytes N]` — upload a file after verifying the issue exists
+  - Upload refuses symlinks, non-regular, unreadable and empty files before any network request.
+  - The default limit is 25 MiB (26214400 bytes); `N` must be positive.
+  - `NAME` must be a plain basename without path separators; it defaults to the local filename.
+  - Output is one JSON object with `issue`, `id`, `filename` and `size`, or one line with `--format text`.
+  - Upload POSTs are not automatically retried; check the issue before repeating a request whose response was lost.
 
 ### Create
 - `jira-mgmt create --type <type> --summary "..." --project KEY`

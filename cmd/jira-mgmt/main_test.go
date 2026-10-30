@@ -6,7 +6,23 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/relux-works/skill-jira-management/internal/config"
 )
+
+// TestMain keeps every command test away from the user's configuration.
+func TestMain(m *testing.M) {
+	dir, err := os.MkdirTemp("", "jira-mgmt-command-tests-*")
+	if err != nil {
+		panic(err)
+	}
+	newConfigManager = func() (*config.ConfigManager, error) {
+		return config.NewConfigManagerWithPath(filepath.Join(dir, "config.yaml")), nil
+	}
+	code := m.Run()
+	os.RemoveAll(dir)
+	os.Exit(code)
+}
 
 func TestWritePrivateFile(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "nested", "attachment.bin")

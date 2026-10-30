@@ -300,6 +300,26 @@ jira-mgmt attachment fetch PROJ-123 20001 --out .temp/PROJ-123/review.docx
 The output must not already exist. `--max-bytes` defaults to 32 MiB and is
 capped at 100 MiB. The client refuses cross-origin content URLs and redirects.
 
+### jira-mgmt attachment upload
+
+Upload one local file after verifying that the issue exists:
+
+```bash
+jira-mgmt attachment upload PROJ-123 ./review.docx
+jira-mgmt attachment upload PROJ-123 ./review.docx --name final-review.docx --max-bytes 26214400
+```
+
+The issue key, filename and file are validated before any network request.
+The file must be readable, non-empty and regular; symlinks are refused.
+`--name` defaults to the local basename and must have no path separators.
+`--max-bytes` defaults to 25 MiB (26214400) and must be positive.
+
+A 404 issue read prevents the upload. The multipart POST uses the configured
+Cloud or Server/DC API version, authentication and TLS settings, including
+`--insecure`. It is not automatically retried.
+The default JSON output contains `issue`, `id`, `filename` and `size`;
+`--format text` prints one line.
+
 ---
 
 ## Create Commands

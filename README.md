@@ -90,11 +90,20 @@ jira-mgmt grep "deploy" --scope comments    # Search comments
 ```bash
 jira-mgmt q 'get(PROJ-123){attachments}'
 jira-mgmt attachment fetch PROJ-123 20001 --out .temp/PROJ-123/review.docx
+jira-mgmt attachment upload PROJ-123 ./review.docx --name review.docx
 ```
 
 Attachment fetch first verifies that the attachment belongs to the named issue,
 requires a same-origin Jira content URL, refuses redirects, caps the response,
 and writes a new mode-`0600` file atomically.
+
+Attachment upload validates the issue key, filename and local file before any
+network request, then reads the issue before posting a multipart attachment.
+It refuses symlinks, non-regular, unreadable and empty files. The default upload
+limit is 25 MiB (26214400 bytes); `--max-bytes N` sets a positive byte limit.
+`--name NAME` overrides the local basename and must contain no path separator.
+JSON output contains `issue`, `id`, `filename` and `size`; `--format text`
+prints one line. Upload requests are not automatically retried.
 
 ### Write Operations
 
